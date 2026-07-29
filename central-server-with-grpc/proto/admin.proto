@@ -1,0 +1,337 @@
+syntax = "proto3";
+
+package federix.v1;
+
+import "common.proto";
+
+service AdminService {
+  // Clients
+  rpc GetOverview(Empty) returns (OverviewResponse);
+  rpc ListClients(ListClientsRequest) returns (stream ClientSummary);
+  rpc GetClientDetail(ClientIdRequest) returns (ClientDetailResponse);
+  rpc BanClient(BanClientRequest) returns (BanClientResponse);
+  rpc UnbanClient(ClientIdRequest) returns (UnbanClientResponse);
+  rpc DeleteClient(ClientIdRequest) returns (DeleteClientResponse);
+
+  // Rounds
+  rpc ListRounds(ListRoundsRequest) returns (stream RoundListEntry);
+  rpc GetRoundDetail(RoundIdRequest) returns (RoundDetailResponse);
+  rpc StartRound(StartRoundRequest) returns (StartRoundResponse);
+  rpc StopRound(StopRoundRequest) returns (StopRoundResponse);
+  rpc ListRoundUpdates(RoundIdRequest) returns (stream AdminUpdateEntry);
+
+  // Metrics
+  rpc GetConvergenceMetrics(MetricsRequest) returns (stream ConvergencePoint);
+  rpc GetClientMetrics(ClientMetricsRequest) returns (stream ClientMetricEntry);
+  rpc GetCommunicationMetrics(MetricsRequest) returns (stream CommunicationPoint);
+  rpc GetFairnessMetrics(MetricsRequest) returns (stream FairnessPoint);
+
+  // Config
+  rpc GetConfig(Empty) returns (ConfigResponse);
+  rpc UpdateConfig(UpdateConfigRequest) returns (UpdateConfigResponse);
+  rpc GetConfigHistory(Empty) returns (stream ConfigHistoryEntry);
+
+  // Models
+  rpc ListModels(Empty) returns (stream ModelEntry);
+  rpc GetModelDownload(ModelIdRequest) returns (AdminModelDownloadResponse);
+  rpc DeleteModel(ModelIdRequest) returns (DeleteModelResponse);
+
+  // Logs & users
+  rpc GetLogs(LogsRequest) returns (stream LogEntry);
+  rpc ListUsers(Empty) returns (stream AdminUserEntry);
+  rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse);
+  rpc DeleteUser(UserIdRequest) returns (DeleteUserResponse);
+}
+
+// ---- Clients ----
+
+message OverviewResponse {
+  int32 total_clients = 1;
+  int32 active_clients = 2;
+  string current_round_id = 3;
+  string current_round_status = 4;
+  int32 latest_model_version = 5;
+  string health = 6;
+}
+
+message ListClientsRequest {
+  int32 page = 1;
+  int32 limit = 2;
+  string status = 3;
+  string sort_by = 4;
+}
+
+message ClientSummary {
+  string client_id = 1;
+  string name = 2;
+  string status = 3;
+  string last_seen = 4;
+  int32 rounds_participated = 5;
+  double utility_avg = 6;
+}
+
+message ClientIdRequest {
+  string client_id = 1;
+}
+
+message ClientHistoryEntry {
+  string round_id = 1;
+  string status = 2;
+  string submitted_at = 3;
+}
+
+message ClientUtilityEntry {
+  string round_id = 1;
+  double score = 2;
+}
+
+message ClientDetailResponse {
+  string client_id = 1;
+  string name = 2;
+  repeated ClientHistoryEntry history = 3;
+  repeated ClientUtilityEntry utility_scores = 4;
+  double label_entropy_avg = 5;
+}
+
+message BanClientRequest {
+  string client_id = 1;
+  string reason = 2;
+  int32 duration_hours = 3; // 0 = permanent
+}
+
+message BanClientResponse {
+  bool success = 1;
+  string banned_until = 2;
+}
+
+message UnbanClientResponse {
+  bool success = 1;
+  string client_status = 2;
+}
+
+message DeleteClientResponse {
+  bool deleted = 1;
+  int32 purged_records = 2;
+}
+
+// ---- Rounds ----
+
+message ListRoundsRequest {
+  int32 page = 1;
+  int32 limit = 2;
+  string status = 3;
+}
+
+message RoundListEntry {
+  string round_id = 1;
+  int32 round_number = 2;
+  RoundStatus status = 3;
+  int32 participant_count = 4;
+  double accuracy = 5;
+  string started_at = 6;
+  string completed_at = 7;
+}
+
+message RoundIdRequest {
+  string round_id = 1;
+}
+
+message RoundUpdateSummary {
+  string update_id = 1;
+  string client_id = 2;
+  UpdateStatus status = 3;
+}
+
+message RoundUtilityEntry {
+  string client_id = 1;
+  double score = 2;
+}
+
+message RoundDetailResponse {
+  string round_id = 1;
+  repeated RoundUpdateSummary updates = 2;
+  repeated RoundUtilityEntry utility_scores = 3;
+  double global_loss = 4;
+  double global_accuracy = 5;
+  string started_at = 6;
+  string completed_at = 7;
+  RoundStatus status = 8;
+}
+
+message StartRoundRequest {
+  int32 max_clients = 1;
+  int32 deadline_seconds = 2;
+  string notes = 3;
+}
+
+message StartRoundResponse {
+  string round_id = 1;
+  int32 round_number = 2;
+  string started_at = 3;
+}
+
+message StopRoundRequest {
+  string round_id = 1;
+  string reason = 2;
+}
+
+message StopRoundResponse {
+  bool success = 1;
+  RoundStatus round_status = 2;
+}
+
+message AdminUpdateEntry {
+  string update_id = 1;
+  string client_id = 2;
+  double utility_score = 3;
+  UpdateStatus status = 4;
+  CompressionLevel compression_level = 5;
+  string submitted_at = 6;
+}
+
+// ---- Metrics ----
+
+message MetricsRequest {
+  int32 last_n_rounds = 1;
+}
+
+message ConvergencePoint {
+  int32 round_number = 1;
+  double global_loss = 2;
+  double global_accuracy = 3;
+  optional double delta_loss = 4;
+}
+
+message ClientMetricsRequest {
+  string client_id = 1;
+  int32 last_n_rounds = 2;
+}
+
+message ClientMetricEntry {
+  string client_id = 1;
+  repeated RoundUtilityEntry round_scores = 2;
+  double avg_utility = 3;
+}
+
+message CommunicationPoint {
+  int32 round_number = 1;
+  int64 bytes_received = 2;
+  int64 bytes_saved = 3;
+  int32 full_count = 4;
+  int32 compressed_count = 5;
+  int32 skipped_count = 6;
+}
+
+message FairnessPoint {
+  int32 round_number = 1;
+  double minority_participation_rate = 2;
+  double gini_coefficient = 3;
+  repeated double utility_distribution = 4;
+}
+
+// ---- Config ----
+
+message ConfigResponse {
+  double mu = 1;
+  int32 min_clients_per_round = 2;
+  int32 max_round_duration_seconds = 3;
+  double utility_threshold_high = 4;
+  double utility_threshold_low = 5;
+  double compression_ratio = 6;
+  int32 max_clients_per_round = 7;
+}
+
+message UpdateConfigRequest {
+  optional double mu = 1;
+  optional int32 min_clients_per_round = 2;
+  optional int32 max_clients_per_round = 3;
+  optional int32 max_round_duration_seconds = 4;
+  optional double utility_threshold_high = 5;
+  optional double utility_threshold_low = 6;
+  optional double compression_ratio = 7;
+  optional int32 local_epochs = 8;
+  optional int32 batch_size = 9;
+}
+
+message UpdateConfigResponse {
+  ConfigResponse updated_config = 1;
+  int32 effective_from_round = 2;
+}
+
+message ConfigHistoryEntry {
+  string changed_at = 1;
+  string changed_by = 2;
+  string diff_json = 3;
+  int32 round_number_applied = 4;
+}
+
+// ---- Models ----
+
+message ModelEntry {
+  string model_id = 1;
+  int32 model_version = 2;
+  string round_id = 3;
+  double accuracy = 4;
+  int64 size_bytes = 5;
+  string created_at = 6;
+}
+
+message ModelIdRequest {
+  string model_id = 1;
+}
+
+message AdminModelDownloadResponse {
+  string download_url = 1;
+  string expires_at = 2;
+  int32 model_version = 3;
+}
+
+message DeleteModelResponse {
+  bool deleted = 1;
+}
+
+// ---- Logs & users ----
+
+message LogsRequest {
+  string level = 1;
+  string actor = 2;
+  string event_type = 3;
+  string from_date = 4;
+  string to_date = 5;
+  int32 limit = 6;
+}
+
+message LogEntry {
+  string timestamp = 1;
+  string level = 2;
+  string actor = 3;
+  string event_type = 4;
+  string details_json = 5;
+}
+
+message AdminUserEntry {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+  Role role = 4;
+  string created_at = 5;
+  string last_login = 6;
+}
+
+message UpdateUserRoleRequest {
+  string user_id = 1;
+  Role role = 2;
+}
+
+message UpdateUserRoleResponse {
+  string user_id = 1;
+  Role new_role = 2;
+}
+
+message UserIdRequest {
+  string user_id = 1;
+}
+
+message DeleteUserResponse {
+  bool deleted = 1;
+}
