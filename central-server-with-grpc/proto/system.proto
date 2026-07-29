@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package federix.v1;
+
+import "common.proto";
+
+service SystemService {
+  rpc HealthCheck(Empty) returns (HealthResponse);
+  rpc GetVersion(Empty) returns (VersionResponse);
+  rpc GetPublicConfig(Empty) returns (PublicConfigResponse);
+  rpc GetStats(Empty) returns (StatsResponse);
+  rpc SetMaintenance(MaintenanceRequest) returns (MaintenanceResponse);
+  rpc FlushCache(Empty) returns (FlushResponse);
+}
+
+message HealthResponse {
+  string status = 1;
+  string db = 2;
+  string redis = 3;
+  string fl_server = 4;
+  int32 queue_depth = 5;
+  int64 uptime_ms = 6;
+}
+
+message VersionResponse {
+  string api_version = 1;
+  string build = 2;
+  string node_version = 3;
+  string environment = 4;
+}
+
+message PublicConfigResponse {
+  repeated string supported_sdk_versions = 1;
+  string server_timezone = 2;
+  int32 max_update_size_mb = 3;
+}
+
+message StatsResponse {
+  int32 active_connections = 1;
+  double memory_mb = 2;
+  int32 req_per_min = 3;
+  int32 queue_depth = 4;
+  double cache_hit_rate = 5;
+}
+
+message MaintenanceRequest {
+  bool enabled = 1;
+  string message = 2;
+  optional int32 estimated_duration_minutes = 3;
+}
+
+message MaintenanceResponse {
+  bool maintenance_mode = 1;
+  string message = 2;
+}
+
+message FlushResponse {
+  int32 flushed_keys = 1;
+  string warning = 2;
+}
