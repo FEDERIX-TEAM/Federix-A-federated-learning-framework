@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package federix.v1;
+
+// Generic empty request/response for RPCs that need no payload.
+message Empty {}
+
+// Roles recognized across the platform (design.md §4 RBAC matrix).
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_SUPER_ADMIN = 1;
+  ROLE_ADMIN = 2;
+  ROLE_FL_ENGINEER = 3;
+  ROLE_VIEWER = 4;
+  ROLE_SDK_CLIENT = 5;
+}
+
+enum RoundStatus {
+  ROUND_STATUS_UNSPECIFIED = 0;
+  ROUND_STATUS_PENDING = 1;
+  ROUND_STATUS_ACTIVE = 2;
+  ROUND_STATUS_AGGREGATING = 3;
+  ROUND_STATUS_COMPLETE = 4;
+  ROUND_STATUS_FAILED = 5;
+  ROUND_STATUS_ABORTED = 6;
+}
+
+enum UpdateStatus {
+  UPDATE_STATUS_UNSPECIFIED = 0;
+  UPDATE_STATUS_PENDING = 1;
+  UPDATE_STATUS_ACCEPTED = 2;
+  UPDATE_STATUS_COMPRESSED = 3;
+  UPDATE_STATUS_REJECTED = 4;
+}
+
+enum CompressionLevel {
+  COMPRESSION_LEVEL_UNSPECIFIED = 0;
+  COMPRESSION_LEVEL_NONE = 1;
+  COMPRESSION_LEVEL_PARTIAL = 2;
+  COMPRESSION_LEVEL_FULL = 3;
+}
+
+// A generic {string: double} map, used for label_distribution payloads.
+message LabelDistribution {
+  map<string, double> counts = 1;
+}
+
+// A generic {string: string} map, used for free-form device_info / details payloads.
+message StringMap {
+  map<string, string> entries = 1;
+}
+
+message StatusResponse {
+  bool success = 1;
+}

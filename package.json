@@ -1,0 +1,37 @@
+{
+  "name": "federix-grpc",
+  "version": "1.0.0",
+  "description": "Federix Central Server \u2014 Fastify + Connect-RPC (gRPC)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "generate": "buf generate",
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed:super-admin": "node scripts/seed-super-admin.js",
+    "smoke": "node scripts/smoke-test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@connectrpc/connect": "^2.1.2",
+    "@connectrpc/connect-fastify": "^2.1.2",
+    "@connectrpc/connect-node": "^2.1.2",
+    "@fastify/cors": "^11.3.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.10.0",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.8.0",
+    "@bufbuild/protobuf": "^2.13.0"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "^1.72.0",
+    "@bufbuild/protoc-gen-es": "^2.13.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
