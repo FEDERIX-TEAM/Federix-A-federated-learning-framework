@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package federix.v1;
+
+import "common.proto";
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc ClientLogin(ClientLoginRequest) returns (TokenResponse);
+  rpc AdminLogin(AdminLoginRequest) returns (AdminTokenResponse);
+  rpc RefreshToken(RefreshRequest) returns (AccessTokenResponse);
+  rpc Logout(Empty) returns (StatusResponse);
+  rpc RotateClientKey(RotateKeyRequest) returns (RotateKeyResponse);
+  rpc CreateAdminUser(CreateAdminRequest) returns (CreateAdminResponse);
+  rpc GetMe(Empty) returns (ProfileResponse);
+}
+
+message RegisterRequest {
+  string name = 1;
+  string description = 2;
+  string sdk_version = 3;
+  string platform = 4;
+}
+
+message RegisterResponse {
+  string client_id = 1;
+  string api_key = 2; // shown only once
+  string created_at = 3;
+}
+
+message ClientLoginRequest {
+  string client_id = 1;
+  string api_key = 2;
+}
+
+message TokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int32 expires_in = 3;
+}
+
+message AdminLoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AdminTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  Role role = 3;
+  string user_id = 4;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message AccessTokenResponse {
+  string access_token = 1;
+  int32 expires_in = 2;
+}
+
+message RotateKeyRequest {
+  string client_id = 1;
+}
+
+message RotateKeyResponse {
+  string new_api_key = 1;
+}
+
+message CreateAdminRequest {
+  string email = 1;
+  string password = 2;
+  Role role = 3;
+  string name = 4;
+}
+
+message CreateAdminResponse {
+  string user_id = 1;
+  Role role = 2;
+  string created_at = 3;
+}
+
+message ProfileResponse {
+  string id = 1;
+  string name = 2;
+  Role role = 3;
+  string created_at = 4;
+  string last_login = 5;
+}
