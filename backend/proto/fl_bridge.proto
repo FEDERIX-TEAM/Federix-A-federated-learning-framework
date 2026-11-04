@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package federix.v1;
+
+import "common.proto";
+
+service FlBridgeService {
+  rpc TriggerRound(TriggerRoundRequest) returns (TriggerRoundResponse);
+  rpc CompleteRound(CompleteRoundRequest) returns (CompleteRoundResponse);
+  rpc GetRoundUpdates(RoundUpdatesRequest) returns (stream RoundUpdateEntry);
+  rpc PushModel(PushModelRequest) returns (PushModelResponse);
+  rpc GetFlStatus(Empty) returns (FlStatusResponse);
+  rpc ComputeUtility(ComputeUtilityRequest) returns (stream UtilityResult);
+  rpc GetFlConfig(Empty) returns (FlConfigResponse);
+}
+
+message TriggerRoundRequest {
+  string round_id = 1;
+  repeated string update_ids = 2;
+}
+
+message TriggerRoundResponse {
+  bool accepted = 1;
+  int32 estimated_duration_ms = 2;
+}
+
+message ModelMetrics {
+  double global_loss = 1;
+  double global_accuracy = 2;
+}
+
+message CompleteRoundRequest {
+  string round_id = 1;
+  int32 new_model_version = 2;
+  string model_url = 3;
+  double global_loss = 4;
+  double global_accuracy = 5;
+}
+
+message CompleteRoundResponse {
+  bool success = 1;
+  bool next_round_scheduled = 2;
+  string model_id = 3;
+}
+
+message RoundUpdatesRequest {
+  string round_id = 1;
+}
+
+message RoundUpdateEntry {
+  string update_id = 1;
+  string client_id = 2;
+  string download_url = 3;
+  double utility_score = 4;
+  LabelDistribution label_distribution = 5;
+}
+
+message PushModelRequest {
+  optional string round_id = 1;
+  int32 model_version = 2;
+  string weights_url = 3;
+  ModelMetrics metrics = 4;
+}
+
+message PushModelResponse {
+  bool stored = 1;
+  string model_id = 2;
+}
+
+message FlStatusResponse {
+  string status = 1;
+  string version = 2;
+  string last_round_id = 3;
+  int64 uptime_ms = 4;
+}
+
+message ComputeUtilityRequest {
+  string round_id = 1;
+  repeated string update_ids = 2;
+}
+
+message UtilityResult {
+  string update_id = 1;
+  double utility_score = 2;
+  CompressionLevel compression_level = 3;
+}
+
+message FlConfigResponse {
+  double mu = 1;
+  double utility_threshold_high = 2;
+  double utility_threshold_low = 3;
+  double compression_ratio = 4;
+  int32 min_clients = 5;
+}

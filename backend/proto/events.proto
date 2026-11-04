@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package federix.v1;
+
+import "common.proto";
+
+service EventStreamService {
+  // Long-lived server-streaming call — replaces the /api/v1/ws WebSocket connection.
+  // The caller's JWT (from call metadata) determines which event types they receive,
+  // per the audience table in design.md §3.
+  rpc Subscribe(SubscribeRequest) returns (stream Event);
+}
+
+message SubscribeRequest {}
+
+message Event {
+  string type = 1; // e.g. "round_started", "client_banned" — see design.md §3 event table
+  string payload_json = 2; // JSON-encoded payload, shape depends on `type`
+  string timestamp = 3;
+}

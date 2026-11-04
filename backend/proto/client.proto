@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package federix.v1;
+
+import "common.proto";
+
+service ClientService {
+  rpc GetStatus(Empty) returns (ClientStatusResponse);
+  rpc GetCurrentRound(Empty) returns (RoundSummary);
+  rpc JoinRound(JoinRoundRequest) returns (JoinRoundResponse);
+  rpc LeaveRound(LeaveRoundRequest) returns (LeaveRoundResponse);
+  rpc GetModelDownload(ModelDownloadRequest) returns (ModelDownloadResponse);
+  rpc SubmitUpdate(SubmitUpdateRequest) returns (SubmitUpdateResponse);
+  rpc GetUpdateStatus(UpdateStatusRequest) returns (UpdateStatusResponse);
+  rpc GetSelfMetrics(SelfMetricsRequest) returns (stream SelfMetricEntry);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetConfig(Empty) returns (ClientConfigResponse);
+}
+
+message ClientStatusResponse {
+  string client_id = 1;
+  string status = 2;
+  string last_seen = 3;
+  int32 round_count = 4;
+}
+
+message RoundSummary {
+  string round_id = 1;
+  int32 round_number = 2;
+  int32 model_version = 3;
+  string deadline = 4;
+  int32 participants = 5;
+}
+
+message JoinRoundRequest {
+  string round_id = 1;
+  int32 local_data_size = 2;
+  StringMap device_info = 3;
+}
+
+message JoinRoundResponse {
+  bool accepted = 1;
+  string model_download_url = 2;
+  string instructions = 3;
+}
+
+message LeaveRoundRequest {
+  string round_id = 1;
+  string reason = 2;
+}
+
+message LeaveRoundResponse {
+  bool success = 1;
+  int32 remaining_participants = 2;
+}
+
+message ModelDownloadRequest {
+  optional string round_id = 1;
+  optional int32 model_version = 2;
+}
+
+message ModelDownloadResponse {
+  string download_url = 1;
+  int32 model_version = 2;
+  string format = 3;
+  string expires_at = 4;
+}
+
+message SubmitUpdateRequest {
+  string round_id = 1;
+  string delta_weights_url = 2;
+  double local_loss_before = 3;
+  double local_loss_after = 4;
+  LabelDistribution label_distribution = 5;
+  int32 data_size = 6;
+  int32 training_time_ms = 7;
+}
+
+message SubmitUpdateResponse {
+  string update_id = 1;
+  bool accepted = 2;
+  bool compression_required = 3;
+}
+
+message UpdateStatusRequest {
+  string round_id = 1;
+}
+
+message UpdateStatusResponse {
+  string update_id = 1;
+  UpdateStatus status = 2;
+  double utility_score = 3;
+  string reason = 4;
+}
+
+message SelfMetricsRequest {
+  int32 limit = 1;
+}
+
+message SelfMetricEntry {
+  string round_id = 1;
+  double utility_score = 2;
+  UpdateStatus status = 3;
+  double loss_improvement = 4;
+}
+
+message HeartbeatRequest {
+  string round_id = 1;
+}
+
+message HeartbeatResponse {
+  bool ok = 1;
+  string server_time = 2;
+}
+
+message ClientConfigResponse {
+  double mu = 1;
+  int32 local_epochs = 2;
+  int32 batch_size = 3;
+  double compression_threshold = 4;
+}
