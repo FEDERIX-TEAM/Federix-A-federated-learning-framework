@@ -1,4 +1,5 @@
 import { Client } from '../../models/Client.js';
+import { config } from '../../config/index.js';
 import { AdminUser } from '../../models/AdminUser.js';
 import { hashPassword, verifyPassword } from '../../utils/password.js';
 import { newId, newApiKey } from '../../utils/ids.js';
@@ -152,7 +153,8 @@ export function createAuthService({ redis }) {
       const role = ROLE_FROM_PROTO[req.role];
       if (!email || !password || !name) throw invalidArg('email, password, role and name are required');
       if (!CREATABLE_ROLES.includes(role)) throw invalidArg(`role must be one of ${CREATABLE_ROLES.join(', ')}`);
-      if (password.length < 8) throw invalidArg('password must be at least 8 characters');
+      const minLength = config.security.minPasswordLength;
+      if (password.length < minLength) throw invalidArg(`password must be at least ${minLength} characters`);
 
       const normalized = email.toLowerCase().trim();
       if (await AdminUser.exists({ email: normalized })) throw alreadyExists('Email already in use');

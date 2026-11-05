@@ -25,8 +25,9 @@ async function main() {
 
   const email = (process.env.SEED_EMAIL || (await ask('Super admin email: '))).toLowerCase().trim();
   const name = (process.env.SEED_NAME || (await ask('Super admin name: '))).trim();
-  const password = process.env.SEED_PASSWORD || (await ask('Super admin password (min 8 chars): '));
-  if (!email || !name || password.length < 8) throw new Error('email, name and a password of at least 8 characters are required');
+  const password = process.env.SEED_PASSWORD || (await ask(`Super admin password (min ${config.security.minPasswordLength} chars): `));
+  const minLength = config.security.minPasswordLength;
+  if (!email || !name || password.length < minLength) throw new Error(`email, name and a password of at least ${minLength} characters are required`);
 
   const user = await AdminUser.create({
     user_id: newId(),

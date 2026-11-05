@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { verify } from '../utils/signedUrl.js';
+import { config } from '../config/index.js';
 
 /**
  * Serves files behind the HMAC-signed URLs produced by utils/signedUrl.js
@@ -8,7 +9,7 @@ import { verify } from '../utils/signedUrl.js';
  * Files are read from STORAGE_DIR (default ./storage). This is a local stand-in for S3/GCS:
  * swap utils/signedUrl.js for real presigned URLs in production and delete this route.
  */
-export function registerStorageRoute(app, rootDir = process.env.STORAGE_DIR || './storage') {
+export function registerStorageRoute(app, rootDir = config.storage.dir) {
   const root = path.resolve(rootDir);
 
   app.get('/storage/*', async (request, reply) => {

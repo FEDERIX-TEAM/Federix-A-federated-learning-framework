@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import Redis from 'ioredis';
-import { config } from '../config/index.js';
+import { config, configProblems } from '../config/index.js';
 
-const TIMEOUT_MS = 3000;
+const TIMEOUT_MS = config.db.connectTimeoutMs;
 
 async function checkMongo() {
   try {
@@ -33,6 +33,14 @@ async function checkRedis() {
   } finally {
     client.disconnect();
   }
+}
+
+const invalid = configProblems();
+if (invalid.length) {
+  console.error('\nInvalid configuration:\n');
+  for (const p of invalid) console.error(`  - ${p}`);
+  console.error('\nFix these in .env or the environment, then try again.\n');
+  process.exit(1);
 }
 
 const failures = (await Promise.all([checkMongo(), checkRedis()])).filter(Boolean);

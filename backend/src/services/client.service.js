@@ -1,4 +1,5 @@
 import { Client } from '../../models/Client.js';
+import { config as appConfig } from '../../config/index.js';
 import { Round } from '../../models/Round.js';
 import { Update } from '../../models/Update.js';
 import { GlobalModel } from '../../models/GlobalModel.js';
@@ -232,10 +233,9 @@ export function createClientService() {
         { upsert: true, returnDocument: 'after' }
       );
 
-      // Keep the client's running utility average current (over its most recent 200 scored updates).
       const recent = await Update.find({ client_id: clientId, utility_score: { $ne: null } })
         .sort({ submitted_at: -1 })
-        .limit(200)
+        .limit(appConfig.limits.utilityAvgWindow)
         .select('utility_score');
       if (recent.length) {
         const avg = recent.reduce((sum, u) => sum + u.utility_score, 0) / recent.length;
@@ -269,7 +269,7 @@ export function createClientService() {
     async *getSelfMetrics(req, ctx) {
       const updates = await Update.find({ client_id: clientIdOf(ctx) })
         .sort({ submitted_at: -1 })
-        .limit(clampN(req.limit, 10, 100));
+        .limit(clampN(req.limit, appConfig.limits.selfMetricsLimitDefault, appConfig.limits.selfMetricsLimitMax));
 
       for (const u of updates) {
         yield {

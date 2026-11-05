@@ -40,7 +40,8 @@ export function createFlBridgeService() {
       await logEvent({ actor: 'fl-server', eventType: 'round.aggregation_triggered', details: { round_id: req.roundId } });
 
       // Heuristic estimate; the real FL server may ignore it.
-      return { accepted: true, estimatedDurationMs: Math.max(5000, req.updateIds.length * 800) };
+      const { baseMs, perUpdateMs } = appConfig.aggregationEstimate;
+      return { accepted: true, estimatedDurationMs: Math.max(baseMs, req.updateIds.length * perUpdateMs) };
     },
 
     async completeRound(req) {

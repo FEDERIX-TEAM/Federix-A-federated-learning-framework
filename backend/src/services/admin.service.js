@@ -5,6 +5,7 @@ import { GlobalModel } from '../../models/GlobalModel.js';
 import { AdminUser } from '../../models/AdminUser.js';
 import { AuditLog } from '../../models/AuditLog.js';
 import { SystemConfig, ConfigHistory } from '../../models/SystemConfig.js';
+import { config as appConfig } from '../../config/index.js';
 import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
 import { labelEntropy } from '../../utils/utilityScore.js';
@@ -26,11 +27,12 @@ const CLIENT_SORT_FIELDS = ['created_at', 'name', 'last_seen', 'rounds_participa
 const ASSIGNABLE_ROLES = ['admin', 'fl_engineer', 'viewer'];
 
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-const pageArgs = (req, defLimit = 20) => {
-  const limit = clampN(req.limit, defLimit, 200);
+const pageArgs = (req) => {
+  const limit = clampN(req.limit, appConfig.limits.pageSizeDefault, appConfig.limits.pageSizeMax);
   const page = Math.max(1, req.page || 1);
   return { limit, skip: (page - 1) * limit };
 };
+const metricsRounds = (req) => clampN(req.lastNRounds, appConfig.limits.metricsRoundsDefault, appConfig.limits.metricsRoundsMax);
 
 export function createAdminService() {
   return {
@@ -77,7 +79,7 @@ export function createAdminService() {
       const client = await Client.findOne({ client_id: req.clientId });
       if (!client) throw notFound('Client not found');
 
-      const updates = await Update.find({ client_id: client.client_id }).sort({ submitted_at: -1 }).limit(50);
+      const updates = await Update.find({ client_id: client.client_id }).sort({ submitted_at: -1 }).limit(appConfig.limits.clientHistoryLimit);
       return {
         clientId: client.client_id,
         name: client.name,
@@ -273,7 +275,7 @@ export function createAdminService() {
 
     // ───────────── Metrics ─────────────
     async *getConvergenceMetrics(req) {
-      const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(clampN(req.lastNRounds));
+      const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(metricsRounds(req));
       const ordered = rounds.reverse();
       for (let i = 0; i < ordered.length; i += 1) {
         const r = ordered[i];
@@ -287,9 +289,9 @@ export function createAdminService() {
     },
 
     async *getClientMetrics(req) {
-      const n = clampN(req.lastNRounds);
+      const n = metricsRounds(req);
       const filter = req.clientId ? { client_id: req.clientId } : {};
-      const updates = await Update.find(filter).sort({ submitted_at: -1 }).limit(req.clientId ? n : n * 50);
+      const updates = await Update.find(filter).sort({ submitted_at: -1 }).limit(req.clientId ? n : n * appConfig.limits.clientMetricsScanFactor);
 
       const byClient = new Map();
       for (const u of updates) {
@@ -302,7 +304,7 @@ export function createAdminService() {
     },
 
     async *getCommunicationMetrics(req) {
-      const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(clampN(req.lastNRounds));
+      const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(metricsRounds(req));
       for (const r of rounds.reverse()) {
         const updates = await Update.find({ round_id: r.round_id });
         const compressed = updates.filter((u) => u.compression_level && u.compression_level !== 'none');
@@ -319,7 +321,7 @@ export function createAdminService() {
     },
 
     async *getFairnessMetrics(req) {
-      const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(clampN(req.lastNRounds));
+      const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(metricsRounds(req));
       for (const r of rounds.reverse()) {
         const scores = (await Update.find({ round_id: r.round_id })).map((u) => num(u.utility_score));
         const joined = joinedCount(r);
@@ -400,7 +402,7 @@ export function createAdminService() {
     },
 
     async *getConfigHistory() {
-      const history = await ConfigHistory.find().sort({ changed_at: -1 }).limit(100);
+      const history = await ConfigHistory.find().sort({ changed_at: -1 }).limit(appConfig.limits.configHistoryLimit);
       for (const h of history) {
         yield {
           changedAt: dateToIso(h.changed_at),
@@ -456,7 +458,7 @@ export function createAdminService() {
       const to = parseDate(req.toDate, 'to_date');
       if (from || to) filter.timestamp = { ...(from && { $gte: from }), ...(to && { $lte: to }) };
 
-      const logs = await AuditLog.find(filter).sort({ timestamp: -1 }).limit(clampN(req.limit, 100, 500));
+      const logs = await AuditLog.find(filter).sort({ timestamp: -1 }).limit(clampN(req.limit, appConfig.limits.logsLimitDefault, appConfig.limits.logsLimitMax));
       for (const l of logs) {
         yield {
           timestamp: dateToIso(l.timestamp),

@@ -1,15 +1,16 @@
-// Tiny sliding-window request counter used by SystemService.GetStats.
-const WINDOW_MS = 60_000;
+import { config } from '../../config/index.js';
+
 let stamps = [];
 
 export function recordRequest() {
   const now = Date.now();
   stamps.push(now);
-  if (stamps.length > 50_000) stamps = stamps.slice(-25_000);
+  const { maxSamples } = config.requestMetrics;
+  if (stamps.length > maxSamples) stamps = stamps.slice(-Math.floor(maxSamples / 2));
 }
 
 export function requestsLastMinute() {
-  const cutoff = Date.now() - WINDOW_MS;
+  const cutoff = Date.now() - config.requestMetrics.windowMs;
   stamps = stamps.filter((t) => t >= cutoff);
   return stamps.length;
 }
