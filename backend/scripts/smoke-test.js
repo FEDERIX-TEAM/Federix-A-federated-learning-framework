@@ -15,7 +15,7 @@ import { AdminService } from '../src/gen/admin_pb.js';
 import { SystemService } from '../src/gen/system_pb.js';
 import { FlBridgeService } from '../src/gen/fl_bridge_pb.js';
 import { EventStreamService } from '../src/gen/events_pb.js';
-import { Role, RoundStatus, UpdateStatus } from '../src/gen/common_pb.js';
+import { Role, RoundStatus, UpdateStatus, CompressionLevel } from '../src/gen/common_pb.js';
 
 const BASE = process.env.SERVER_URL || 'http://127.0.0.1:4000';
 const INTERNAL = process.env.INTERNAL_SERVICE_TOKEN || 'dev_internal_service_token_change_me';
@@ -127,6 +127,13 @@ async function main() {
   const cur = await client.getCurrentRound({}, clients[0]);
   check('GetCurrentRound', cur.roundId === start.roundId);
 
+  const midRound = await admin.updateConfig({ utilityThresholdLow: 0.95, utilityThresholdHigh: 0.99, mu: 0.07 }, SA);
+  check('UpdateConfig mid-round applies from the next round', midRound.effectiveFromRound === start.roundNumber + 1);
+  const roundCfg = await client.getConfig({}, clients[0]);
+  check('Client GetConfig mid-round keeps the round snapshot', roundCfg.mu === 0.02 && roundCfg.compressionThreshold === 0.5);
+  const roundFlCfg = await fl.getFlConfig({}, internal);
+  check('GetFlConfig mid-round keeps the round snapshot', roundFlCfg.utilityThresholdLow === 0.05 && roundFlCfg.utilityThresholdHigh === 0.5 && roundFlCfg.mu === 0.02);
+
   for (const c of clients) {
     const j = await client.joinRound({ roundId: start.roundId, localDataSize: 800, deviceInfo: { entries: { os: 'linux' } } }, c);
     check(`JoinRound ${c.id.slice(0, 6)}`, j.accepted === true);
@@ -147,9 +154,11 @@ async function main() {
   const s0 = await submit(clients[0], 1.0, 0.2, 5000, { a: 100, b: 100, c: 100 });
   const s1 = await submit(clients[1], 1.0, 0.9, 200, { a: 100 });
   const s2 = await submit(clients[2], 1.0, 1.0, 1, { a: 1 });
-  check('SubmitUpdate good -> accepted', s0.accepted && !s0.compressionRequired);
+  check('SubmitUpdate good -> accepted (scored with snapshot, not live 0.95/0.99)', s0.accepted && !s0.compressionRequired);
   check('SubmitUpdate mediocre -> compression_required', s1.accepted && s1.compressionRequired);
   check('SubmitUpdate poor -> rejected', s2.accepted === false);
+  const s2Status = await client.getUpdateStatus({ roundId: start.roundId }, clients[2]);
+  check('Rejection reason cites the snapshot threshold', s2Status.reason.includes('threshold 0.05'), s2Status.reason);
   await expectCode('SubmitUpdate NaN loss -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, NaN, 200, { a: 100 }));
   await expectCode('SubmitUpdate Infinity loss -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], Infinity, 0.5, 200, { a: 100 }));
   await expectCode('SubmitUpdate Infinity label count -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, 0.5, 200, { a: Infinity, b: 3 }));
@@ -191,6 +200,9 @@ async function main() {
   check('GetRoundUpdates returns accepted+compressed only', ups.length === 2 && ups.every((u) => u.downloadUrl.startsWith('/storage/updates/')));
   const util = await collect(fl.computeUtility({ roundId: start.roundId, updateIds: [s0.updateId, s1.updateId, s2.updateId] }, internal));
   check('ComputeUtility', util.length === 3);
+  const utilById = Object.fromEntries(util.map((u) => [u.updateId, u]));
+  check('ComputeUtility uses the round snapshot thresholds', utilById[s0.updateId].compressionLevel === CompressionLevel.NONE && utilById[s1.updateId].compressionLevel === CompressionLevel.PARTIAL);
+  await expectCode('ComputeUtility unknown round -> NotFound', Code.NotFound, () => collect(fl.computeUtility({ roundId: 'no-such-round', updateIds: [] }, internal)));
   const trig = await fl.triggerRound({ roundId: start.roundId, updateIds: ups.map((u) => u.updateId) }, internal);
   check('TriggerRound', trig.accepted && trig.estimatedDurationMs >= 5000);
   check('Round is aggregating', (await admin.getRoundDetail({ roundId: start.roundId }, SA)).status === RoundStatus.AGGREGATING);
@@ -248,6 +260,9 @@ async function main() {
 
   section('Stop round (second round)');
   const r2 = await admin.startRound({}, SA); // 0/0 -> configured defaults
+  const nextCfg = await client.getConfig({}, clients[0]);
+  check('Next round picks up the mid-round config change', nextCfg.mu === 0.07 && nextCfg.compressionThreshold === 0.99);
+  check('GetFlConfig for the next round uses its snapshot', (await fl.getFlConfig({}, internal)).utilityThresholdLow === 0.95);
   const stopped = await admin.stopRound({ roundId: r2.roundId, reason: 'smoke' }, adminUser);
   check('StartRound defaults + StopRound', stopped.success && stopped.roundStatus === RoundStatus.ABORTED);
   await expectCode('StopRound again -> FailedPrecondition', Code.FailedPrecondition, () => admin.stopRound({ roundId: r2.roundId }, SA));

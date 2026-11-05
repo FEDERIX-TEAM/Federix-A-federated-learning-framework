@@ -6,7 +6,7 @@ import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
 import { computeUtilityScore } from '../../utils/utilityScore.js';
 import { dateToIso, UPDATE_STATUS_TO_PROTO, stringMapToPlain, labelDistributionFromMessage } from '../../utils/protoMappers.js';
-import { authOf, getActiveConfig, clampN, joinedCount, num } from '../lib/helpers.js';
+import { authOf, configForRound, configForCurrentRound, clampN, joinedCount, num } from '../lib/helpers.js';
 import { invalidArg, notFound, permissionDenied, failedPrecondition } from '../lib/errors.js';
 import { requireFinite, requireLabelDistribution } from '../lib/validate.js';
 import { publish, ADMIN_ROLES } from '../lib/events.js';
@@ -154,7 +154,7 @@ export function createClientService() {
       const participant = round.participants.find((p) => p.client_id === clientId && p.status === 'joined');
       if (!participant) throw permissionDenied('Client is not an active participant in this round');
 
-      const config = await getActiveConfig();
+      const config = await configForRound(round);
       const utility = computeUtilityScore({
         localLossBefore: req.localLossBefore,
         localLossAfter: req.localLossAfter,
@@ -270,7 +270,7 @@ export function createClientService() {
     },
 
     async getConfig() {
-      const config = await getActiveConfig();
+      const config = await configForCurrentRound();
       return {
         mu: config.mu,
         localEpochs: config.local_epochs,
