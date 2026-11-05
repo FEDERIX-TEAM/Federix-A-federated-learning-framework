@@ -7,7 +7,7 @@ import * as signedUrl from '../../utils/signedUrl.js';
 import { computeUtilityScore } from '../../utils/utilityScore.js';
 import { logEvent } from '../../utils/auditLog.js';
 import { COMPRESSION_LEVEL_TO_PROTO, labelDistributionToMessage } from '../../utils/protoMappers.js';
-import { getActiveConfig, num } from '../lib/helpers.js';
+import { configForRound, configForCurrentRound, num } from '../lib/helpers.js';
 import { invalidArg, notFound, alreadyExists, failedPrecondition } from '../lib/errors.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 
@@ -120,9 +120,11 @@ export function createFlBridgeService() {
 
     async *computeUtility(req) {
       if (!req.roundId) throw invalidArg('round_id is required');
+      const round = await Round.findOne({ round_id: req.roundId });
+      if (!round) throw notFound('Round not found');
       const [updates, config] = await Promise.all([
         Update.find({ round_id: req.roundId, update_id: { $in: req.updateIds } }),
-        getActiveConfig(),
+        configForRound(round),
       ]);
 
       for (const u of updates) {
@@ -141,7 +143,7 @@ export function createFlBridgeService() {
     },
 
     async getFlConfig() {
-      const config = await getActiveConfig();
+      const config = await configForCurrentRound();
       return {
         mu: config.mu,
         utilityThresholdHigh: config.utility_threshold_high,

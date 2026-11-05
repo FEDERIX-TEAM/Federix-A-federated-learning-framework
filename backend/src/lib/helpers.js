@@ -1,4 +1,5 @@
 import { SystemConfig } from '../../models/SystemConfig.js';
+import { Round } from '../../models/Round.js';
 import { kAuthContext } from '../../interceptors/context.js';
 import { unauthenticated, invalidArg } from './errors.js';
 
@@ -16,6 +17,29 @@ export async function getActiveConfig() {
     { $setOnInsert: { singleton_key: 'active_config' } },
     { upsert: true, returnDocument: 'after' }
   );
+}
+
+const SNAPSHOT_IGNORED_KEYS = new Set(['_id', '__v', 'singleton_key', 'created_at', 'updated_at', 'updated_by']);
+
+export function configFromSnapshot(snapshot, fallback = {}) {
+  const base = typeof fallback?.toObject === 'function' ? fallback.toObject() : { ...fallback };
+  const config = {};
+  for (const [k, v] of Object.entries(base)) if (!SNAPSHOT_IGNORED_KEYS.has(k)) config[k] = v;
+  if (snapshot && typeof snapshot === 'object') {
+    for (const [k, v] of Object.entries(snapshot)) {
+      if (!SNAPSHOT_IGNORED_KEYS.has(k) && v !== undefined && v !== null) config[k] = v;
+    }
+  }
+  return config;
+}
+
+export async function configForRound(round) {
+  return configFromSnapshot(round?.config_snapshot, await getActiveConfig());
+}
+
+export async function configForCurrentRound() {
+  const round = await Round.findOne({ status: { $in: ['active', 'aggregating'] } }).sort({ round_number: -1 });
+  return configForRound(round);
 }
 
 /** Clamp a client-supplied count: 0/negative -> def, above max -> max. */
