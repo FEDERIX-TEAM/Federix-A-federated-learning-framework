@@ -1,8 +1,16 @@
+import crypto from 'node:crypto';
 import { ConnectError, Code } from '@connectrpc/connect';
 import { verifyAccessToken } from '../utils/jwt.js';
+import { createSessionStore } from '../src/lib/sessions.js';
 import { ruleFor } from './rbacRules.js';
 import { kAuthContext, kIsInternal } from './context.js';
 import { config } from '../config/index.js';
+
+const storeByRedis = new WeakMap();
+function sessions(redis) {
+  if (!storeByRedis.has(redis)) storeByRedis.set(redis, createSessionStore(redis));
+  return storeByRedis.get(redis);
+}
 
 function serviceShortName(req) {
   return req.service.typeName.split('.').pop();
@@ -26,13 +34,23 @@ async function checkJwt(req, redis) {
   if (blacklisted) {
     throw new ConnectError('Token has been invalidated', Code.Unauthenticated);
   }
+  if (!(await sessions(redis).isActive(decoded.fam))) {
+    throw new ConnectError('Session has ended, please log in again', Code.Unauthenticated);
+  }
 
-  return decoded; // { sub, role, client_id?, jti, iat, exp }
+  return decoded; // { sub, role, client_id?, fam, jti, iat, exp }
+}
+
+const digest = (value) => crypto.createHash('sha256').update(value).digest();
+
+export function internalTokenMatches(token) {
+  if (!token) return false;
+  return crypto.timingSafeEqual(digest(token), digest(config.internalServiceToken));
 }
 
 function checkInternalToken(req) {
   const token = req.header.get('x-internal-service-token');
-  if (!token || token !== config.internalServiceToken) {
+  if (!internalTokenMatches(token)) {
     return false;
   }
   // Best-effort IP check — Connect/Fastify don't give interceptors the raw socket

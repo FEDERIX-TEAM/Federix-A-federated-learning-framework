@@ -74,6 +74,22 @@ async function waitForHealthy(baseUrl, child, stderr) {
   throw new Error(`test server did not become healthy within ${STARTUP_TIMEOUT_MS}ms\n${stderr.join('')}`);
 }
 
+export async function runServerUntilExit(envOverrides, timeoutMs = STARTUP_TIMEOUT_MS) {
+  const port = await freePort();
+  const child = spawn(process.execPath, ['src/index.js'], {
+    cwd: BACKEND_ROOT,
+    env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), LOG_LEVEL: 'warn', ...envOverrides },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const output = [];
+  child.stdout.on('data', (d) => output.push(String(d)));
+  child.stderr.on('data', (d) => output.push(String(d)));
+  const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+  const [code, signal] = await once(child, 'exit');
+  clearTimeout(timer);
+  return { code, signal, output: output.join('') };
+}
+
 export async function startTestServer() {
   const suffix = `${process.pid}_${randomBytes(4).toString('hex')}`;
   const dbName = `federix_test_${suffix}`;

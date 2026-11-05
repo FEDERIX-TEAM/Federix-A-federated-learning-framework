@@ -2,78 +2,52 @@ import mongoose from 'mongoose';
 import Redis from 'ioredis';
 import { config } from './config/index.js';
 
+const CONNECT_TIMEOUT_MS = 3000;
+const REDIS_MAX_BACKOFF_MS = 2000;
+
 export async function connectMongo(logger) {
   mongoose.set('strictQuery', true);
-  mongoose.set('bufferCommands', false); // fail fast instead of buffering ops while disconnected
+  mongoose.set('bufferCommands', false);
 
   try {
-    await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: 3000 });
-    logger.info(`MongoDB connected: ${config.mongoUri}`);
+    await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: CONNECT_TIMEOUT_MS });
   } catch (err) {
-    logger.warn({ err: err.message }, 'MongoDB connection failed — server continues, DB calls will fail until it recovers.');
+    throw new Error(`MongoDB is not reachable at ${config.mongoUri}: ${err.message}`);
   }
+  logger.info(`MongoDB connected: ${config.mongoUri}`);
 
-  mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
+  mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected; the driver will keep retrying'));
+  mongoose.connection.on('reconnected', () => logger.info('MongoDB reconnected'));
 }
 
-function createMemoryRedis(logger) {
-  logger.warn('Falling back to in-memory Redis stub — sessions/blacklist will NOT persist across restarts and will NOT work across multiple server instances.');
-
-  const store = new Map();
-  const isExpired = (entry) => entry.expiresAt !== null && entry.expiresAt <= Date.now();
-
-  return {
-    isMemoryFallback: true,
-    async set(key, value, mode, ttlSeconds) {
-      const expiresAt = mode === 'EX' && ttlSeconds ? Date.now() + ttlSeconds * 1000 : null;
-      store.set(key, { value, expiresAt });
-      return 'OK';
-    },
-    async get(key) {
-      const entry = store.get(key);
-      if (!entry) return null;
-      if (isExpired(entry)) {
-        store.delete(key);
-        return null;
-      }
-      return entry.value;
-    },
-    async del(key) {
-      return store.delete(key) ? 1 : 0;
-    },
-    async exists(key) {
-      const entry = store.get(key);
-      if (!entry) return 0;
-      if (isExpired(entry)) {
-        store.delete(key);
-        return 0;
-      }
-      return 1;
-    },
-    async flushall() {
-      const count = store.size;
-      store.clear();
-      return count;
-    },
-    async quit() {
-      store.clear();
-    },
-  };
-}
+export const redisBackoff = (attempt) => Math.min(attempt * 200, REDIS_MAX_BACKOFF_MS);
 
 export async function createRedisClient(logger) {
+  const client = new Redis(config.redisUrl, {
+    lazyConnect: true,
+    connectTimeout: CONNECT_TIMEOUT_MS,
+    maxRetriesPerRequest: 3,
+    retryStrategy: redisBackoff,
+  });
+
+  let lastError = null;
+  client.on('error', (err) => {
+    if (err.message !== lastError) logger.warn({ err: err.message }, 'Redis error');
+    lastError = err.message;
+  });
+  client.on('reconnecting', (ms) => logger.warn(`Redis reconnecting in ${ms}ms`));
+  client.on('ready', () => {
+    if (lastError) logger.info('Redis connection restored');
+    lastError = null;
+  });
+
   try {
-    const client = new Redis(config.redisUrl, {
-      lazyConnect: true,
-      retryStrategy: () => null,
-      maxRetriesPerRequest: 1,
-      connectTimeout: 3000,
-    });
     await client.connect();
-    logger.info(`Redis connected: ${config.redisUrl}`);
-    return client;
+    await client.ping();
   } catch (err) {
-    logger.warn({ err: err.message }, 'Redis connection failed');
-    return createMemoryRedis(logger);
+    client.disconnect();
+    throw new Error(`Redis is not reachable at ${config.redisUrl}: ${err.message}`);
   }
+  logger.info(`Redis connected: ${config.redisUrl}`);
+  return client;
 }

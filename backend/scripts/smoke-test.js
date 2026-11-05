@@ -74,14 +74,28 @@ async function main() {
   await expectCode('CreateAdminUser duplicate -> AlreadyExists', Code.AlreadyExists, () => auth.createAdminUser({ email: `admin.${sfx}@federix.test`, password: 'Passw0rd!123', role: Role.ADMIN, name: 'x' }, SA));
   await expectCode('CreateAdminUser as admin -> PermissionDenied', Code.PermissionDenied, () => auth.createAdminUser({ email: `z.${sfx}@federix.test`, password: 'Passw0rd!123', role: Role.VIEWER, name: 'z' }, adminUser));
   const refreshed = await auth.refreshToken({ refreshToken: adminUser.refresh });
-  check('RefreshToken', !!refreshed.accessToken);
+  check('RefreshToken returns a rotated refresh token', !!refreshed.accessToken && !!refreshed.refreshToken && refreshed.refreshToken !== adminUser.refresh);
+  adminUser.refresh = refreshed.refreshToken;
+
+  const spare = await auth.adminLogin({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
+  const spareNext = await auth.refreshToken({ refreshToken: spare.refreshToken });
+  await expectCode('Reused refresh token -> Unauthenticated', Code.Unauthenticated, () => auth.refreshToken({ refreshToken: spare.refreshToken }));
+  await expectCode('Reuse revokes the newer refresh token too', Code.Unauthenticated, () => auth.refreshToken({ refreshToken: spareNext.refreshToken }));
+  await expectCode('Reuse revokes the session access token', Code.Unauthenticated, () => auth.getMe({}, bearer(spareNext.accessToken)));
+  check('Other sessions of the same user keep working', (await auth.getMe({}, SA)).role === Role.SUPER_ADMIN);
+
+  const demoted = await mk(Role.ADMIN, 'demoted');
+  await admin.updateUserRole({ userId: demoted.id, role: Role.VIEWER }, SA);
+  const demotedRefresh = await auth.refreshToken({ refreshToken: demoted.refresh });
+  check('Refresh after demotion carries the new role', (await auth.getMe({}, bearer(demotedRefresh.accessToken))).role === Role.VIEWER);
+  await expectCode('Demoted user loses admin RPCs after refresh', Code.PermissionDenied, () => collect(admin.listClients({}, bearer(demotedRefresh.accessToken))));
 
   section('Auth: clients');
   const clients = [];
   for (let i = 0; i < 3; i += 1) {
     const reg = await auth.register({ name: `smoke-${sfx}-${i}`, description: 'smoke', sdkVersion: '1.0.0', platform: 'linux' });
     const tok = await auth.clientLogin({ clientId: reg.clientId, apiKey: reg.apiKey });
-    clients.push({ id: reg.clientId, apiKey: reg.apiKey, ...bearer(tok.accessToken), token: tok.accessToken });
+    clients.push({ id: reg.clientId, apiKey: reg.apiKey, ...bearer(tok.accessToken), token: tok.accessToken, refresh: tok.refreshToken });
   }
   check('Register + ClientLogin x3', clients.every((c) => c.id && c.token));
   await expectCode('ClientLogin bad key -> Unauthenticated', Code.Unauthenticated, () => auth.clientLogin({ clientId: clients[0].id, apiKey: 'fdx_bad' }));
@@ -242,6 +256,8 @@ async function main() {
   const ban = await admin.banClient({ clientId: clients[1].id, reason: 'smoke', durationHours: 1 }, adminUser);
   check('BanClient (timed)', ban.success && ban.bannedUntil !== '');
   await expectCode('Banned client login -> PermissionDenied', Code.PermissionDenied, () => auth.clientLogin({ clientId: clients[1].id, apiKey: clients[1].apiKey }));
+  await expectCode('Banned client refresh -> PermissionDenied', Code.PermissionDenied, () => auth.refreshToken({ refreshToken: clients[1].refresh }));
+  await expectCode('Banned client session ended', Code.Unauthenticated, () => auth.getMe({}, clients[1]));
   check('ListClients status=banned', (await collect(admin.listClients({ status: 'banned' }, SA))).some((c) => c.clientId === clients[1].id));
   check('UnbanClient', (await admin.unbanClient({ clientId: clients[1].id }, adminUser)).success);
   const permBan = await admin.banClient({ clientId: clients[1].id, durationHours: 0 }, SA);
@@ -288,13 +304,14 @@ async function main() {
   section('Logout, delete client, flush');
   await auth.logout({}, adminUser);
   await expectCode('Token rejected after Logout', Code.Unauthenticated, () => auth.getMe({}, adminUser));
+  await expectCode('Refresh rejected after Logout', Code.Unauthenticated, () => auth.refreshToken({ refreshToken: adminUser.refresh }));
   await expectCode('DeleteClient as admin -> PermissionDenied', Code.PermissionDenied, () => admin.deleteClient({ clientId: clients[0].id }, engineer));
   const del = await admin.deleteClient({ clientId: clients[0].id }, SA);
   check('DeleteClient purges updates', del.deleted && del.purgedRecords >= 1);
   await expectCode('GetClientDetail after delete -> NotFound', Code.NotFound, () => admin.getClientDetail({ clientId: clients[0].id }, SA));
   const fx = await system.flushCache({}, SA);
   check('FlushCache', typeof fx.flushedKeys === 'number' && fx.warning.length > 0);
-  await auth.logout({}, SA);
+  await expectCode('FlushCache ends every session', Code.Unauthenticated, () => auth.getMe({}, SA));
 
   console.log(`\n${failed === 0 ? '✅' : '❌'} ${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
