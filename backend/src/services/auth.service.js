@@ -2,15 +2,17 @@ import { Client } from '../../models/Client.js';
 import { AdminUser } from '../../models/AdminUser.js';
 import { hashPassword, verifyPassword } from '../../utils/password.js';
 import { newId, newApiKey } from '../../utils/ids.js';
-import { signAccessToken, signRefreshToken, verifyRefreshToken, expiresInSeconds } from '../../utils/jwt.js';
+import { verifyRefreshToken, expiresInSeconds } from '../../utils/jwt.js';
 import { logEvent } from '../../utils/auditLog.js';
 import { ROLE_TO_PROTO, ROLE_FROM_PROTO, dateToIso } from '../../utils/protoMappers.js';
 import { authOf } from '../lib/helpers.js';
+import { createSessionStore, ROTATED, REUSE_DETECTED } from '../lib/sessions.js';
 import { invalidArg, notFound, alreadyExists, permissionDenied, unauthenticated } from '../lib/errors.js';
 
 const CREATABLE_ROLES = ['admin', 'fl_engineer', 'viewer'];
 
 export function createAuthService({ redis }) {
+  const sessions = createSessionStore(redis);
   return {
     // Public
     async register(req) {
@@ -47,14 +49,13 @@ export function createAuthService({ redis }) {
         throw permissionDenied(`Client is banned ${until}`);
       }
 
-      const access = signAccessToken({ sub: clientId, role: 'sdk_client', client_id: clientId, jti: newId() });
-      const refresh = signRefreshToken({ sub: clientId, role: 'sdk_client', client_id: clientId, jti: newId() });
+      const session = await sessions.start({ sub: clientId, role: 'sdk_client', client_id: clientId });
 
       client.status = 'active';
       client.last_seen = new Date();
       await client.save();
 
-      return { accessToken: access, refreshToken: refresh, expiresIn: expiresInSeconds() };
+      return { accessToken: session.accessToken, refreshToken: session.refreshToken, expiresIn: expiresInSeconds() };
     },
 
     // Public
@@ -67,14 +68,13 @@ export function createAuthService({ redis }) {
         throw unauthenticated('Invalid email or password');
       }
 
-      const access = signAccessToken({ sub: user.user_id, role: user.role, jti: newId() });
-      const refresh = signRefreshToken({ sub: user.user_id, role: user.role, jti: newId() });
+      const session = await sessions.start({ sub: user.user_id, role: user.role });
 
       user.last_login = new Date();
       await user.save();
       await logEvent({ actor: user.user_id, eventType: 'admin.login', details: { role: user.role } });
 
-      return { accessToken: access, refreshToken: refresh, role: ROLE_TO_PROTO[user.role], userId: user.user_id };
+      return { accessToken: session.accessToken, refreshToken: session.refreshToken, role: ROLE_TO_PROTO[user.role], userId: user.user_id };
     },
 
     // Public — authenticates via the refresh_token field
@@ -87,29 +87,49 @@ export function createAuthService({ redis }) {
       } catch {
         throw unauthenticated('Invalid or expired refresh token');
       }
-      if (await redis.exists(`blacklist:${decoded.jti}`)) throw unauthenticated('Refresh token has been invalidated');
+      if (!decoded.fam || !decoded.jti) throw unauthenticated('Session has expired, please log in again');
 
+      let claims;
       if (decoded.role === 'sdk_client') {
         const client = await Client.findOne({ client_id: decoded.client_id });
-        if (!client) throw unauthenticated('Client no longer exists');
-        if (client.isBanned()) throw permissionDenied('Client is banned');
-      } else if (!(await AdminUser.exists({ user_id: decoded.sub }))) {
-        throw unauthenticated('User no longer exists');
+        if (!client) {
+          await sessions.end(decoded.fam);
+          throw unauthenticated('Client no longer exists');
+        }
+        if (client.isBanned()) {
+          await sessions.end(decoded.fam);
+          throw permissionDenied('Client is banned');
+        }
+        claims = { sub: client.client_id, role: 'sdk_client', client_id: client.client_id };
+      } else {
+        const user = await AdminUser.findOne({ user_id: decoded.sub });
+        if (!user) {
+          await sessions.end(decoded.fam);
+          throw unauthenticated('User no longer exists');
+        }
+        claims = { sub: user.user_id, role: user.role };
       }
 
-      const access = signAccessToken({
-        sub: decoded.sub,
-        role: decoded.role,
-        client_id: decoded.client_id,
-        jti: newId(),
-      });
-      return { accessToken: access, expiresIn: expiresInSeconds() };
+      const rotated = await sessions.rotate(decoded, claims);
+      if (rotated.result === REUSE_DETECTED) {
+        await logEvent({
+          level: 'warn',
+          actor: decoded.sub,
+          eventType: 'session.refresh_reuse',
+          details: { role: claims.role, family: decoded.fam },
+        });
+        throw unauthenticated('Refresh token was already used; this session has been revoked, please log in again');
+      }
+      if (rotated.result !== ROTATED) throw unauthenticated('Session has ended, please log in again');
+
+      return { accessToken: rotated.accessToken, refreshToken: rotated.refreshToken, expiresIn: expiresInSeconds() };
     },
 
     async logout(_req, ctx) {
       const auth = authOf(ctx);
       const ttl = Math.max(1, auth.exp - Math.floor(Date.now() / 1000));
       await redis.set(`blacklist:${auth.jti}`, '1', 'EX', ttl);
+      await sessions.end(auth.fam);
       await logEvent({ actor: auth.sub, eventType: 'session.logout', details: { role: auth.role } });
       return { success: true };
     },

@@ -35,3 +35,31 @@ export const config = {
     build: process.env.BUILD_ID || 'dev-local',
   },
 };
+
+const MIN_SECRET_LENGTH = 32;
+
+export function insecureSecrets(cfg = config) {
+  const secrets = {
+    JWT_ACCESS_SECRET: cfg.jwt.accessSecret,
+    JWT_REFRESH_SECRET: cfg.jwt.refreshSecret,
+    INTERNAL_SERVICE_TOKEN: cfg.internalServiceToken,
+    SIGNED_URL_SECRET: cfg.signedUrl.secret,
+  };
+  const problems = [];
+  for (const [name, value] of Object.entries(secrets)) {
+    if (!value || /change_me/i.test(value)) problems.push(`${name} is still a default value`);
+    else if (value.length < MIN_SECRET_LENGTH) problems.push(`${name} is shorter than ${MIN_SECRET_LENGTH} characters`);
+  }
+  if (secrets.JWT_ACCESS_SECRET && secrets.JWT_ACCESS_SECRET === secrets.JWT_REFRESH_SECRET) {
+    problems.push('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different');
+  }
+  return problems;
+}
+
+export function assertProductionSecrets(cfg = config) {
+  if (cfg.env !== 'production') return;
+  const problems = insecureSecrets(cfg);
+  if (problems.length) {
+    throw new Error(`Refusing to start in production with insecure secrets:\n  - ${problems.join('\n  - ')}`);
+  }
+}

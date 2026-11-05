@@ -12,11 +12,15 @@ export function createSystemService({ redis }) {
   return {
     async healthCheck() {
       const dbOk = mongoose.connection.readyState === 1;
-      let redisState = redis.isMemoryFallback ? 'memory-fallback' : 'connected';
-      try {
-        await redis.set('health:ping', '1', 'EX', 5);
-      } catch {
+      let redisState = 'connected';
+      if (redis.status !== 'ready') {
         redisState = 'unavailable';
+      } else {
+        try {
+          await redis.set('health:ping', '1', 'EX', 5);
+        } catch {
+          redisState = 'unavailable';
+        }
       }
 
       return {
@@ -75,20 +79,15 @@ export function createSystemService({ redis }) {
     },
 
     async flushCache(_req, ctx) {
-      let flushed;
-      if (redis.isMemoryFallback) {
-        flushed = await redis.flushall(); // stub returns the key count
-      } else {
-        flushed = await redis.dbsize();
-        await redis.flushall();
-      }
+      const flushed = await redis.dbsize();
+      await redis.flushdb();
       await logEvent({ actor: authOf(ctx).sub, eventType: 'system.cache_flushed', details: { flushed } });
 
       return {
         flushedKeys: flushed,
         warning:
-          'Redis was flushed: the logout blacklist and maintenance flag were cleared. ' +
-          'Previously logged-out access tokens become valid again until they expire.',
+          'Redis was flushed: every session was ended, so all users and clients must log in again, ' +
+          'and the maintenance flag was cleared.',
       };
     },
   };

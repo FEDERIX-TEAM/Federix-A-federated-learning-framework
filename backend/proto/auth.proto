@@ -58,6 +58,7 @@ message RefreshRequest {
 message AccessTokenResponse {
   string access_token = 1;
   int32 expires_in = 2;
+  string refresh_token = 3;
 }
 
 message RotateKeyRequest {

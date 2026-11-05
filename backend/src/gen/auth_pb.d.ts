@@ -198,6 +198,11 @@ export declare type AccessTokenResponse = Message<"federix.v1.AccessTokenRespons
    * @generated from field: int32 expires_in = 2;
    */
   expiresIn: number;
+
+  /**
+   * @generated from field: string refresh_token = 3;
+   */
+  refreshToken: string;
 };
 
 /**

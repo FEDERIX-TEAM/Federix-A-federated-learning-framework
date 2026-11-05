@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import { fastifyConnectPlugin } from '@connectrpc/connect-fastify';
 import { cors as connectCors } from '@connectrpc/connect';
 
-import { config } from '../config/index.js';
+import { config, assertProductionSecrets } from '../config/index.js';
 import { connectMongo, createRedisClient } from '../db.js';
 import { buildInterceptors } from './interceptors.js';
 import { registerStorageRoute } from './storage.js';
@@ -44,17 +44,14 @@ function buildServerOptions() {
 }
 
 async function main() {
+  assertProductionSecrets();
   const app = Fastify(buildServerOptions());
   const logger = app.log;
 
   await connectMongo(logger);
   const redis = await createRedisClient(logger);
 
-  try {
-    await getActiveConfig(); // make sure the singleton config exists
-  } catch (err) {
-    logger.warn({ err: err.message }, 'Could not verify default SystemConfig (DB unreachable?) — it is created lazily on first use.');
-  }
+  await getActiveConfig();
 
   await app.register(cors, {
     origin: true,
@@ -114,6 +111,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error(`Federix server failed to start: ${err.message}`);
   process.exit(1);
 });

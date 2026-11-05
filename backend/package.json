@@ -12,7 +12,7 @@
     "predev": "npm run check:services",
     "dev": "node --watch src/index.js",
     "pretest": "npm run check:services",
-    "test": "node --test test/*.test.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
     "seed:super-admin": "node scripts/seed-super-admin.js",
     "smoke": "node scripts/smoke-test.js"
   },
