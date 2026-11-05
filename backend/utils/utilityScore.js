@@ -1,5 +1,7 @@
+import { isFiniteNumber, isValidLabelDistribution } from '../src/lib/validate.js';
+
 function labelEntropy(labelDistribution = {}) {
-  const counts = Object.values(labelDistribution).filter((n) => typeof n === 'number' && n > 0);
+  const counts = Object.values(labelDistribution ?? {}).filter((n) => isFiniteNumber(n) && n > 0);
   const total = counts.reduce((a, b) => a + b, 0);
   if (total === 0 || counts.length <= 1) return 0;
 
@@ -13,6 +15,15 @@ function labelEntropy(labelDistribution = {}) {
 }
 
 export function computeUtilityScore({ localLossBefore, localLossAfter, dataSize, labelDistribution }) {
+  if (
+    !isFiniteNumber(localLossBefore) || localLossBefore < 0 ||
+    !isFiniteNumber(localLossAfter) || localLossAfter < 0 ||
+    !isFiniteNumber(dataSize) || dataSize < 0 ||
+    !isValidLabelDistribution(labelDistribution)
+  ) {
+    return null;
+  }
+
   const lossImprovement =
     localLossBefore > 0 ? Math.max(0, (localLossBefore - localLossAfter) / localLossBefore) : 0;
 
@@ -20,6 +31,7 @@ export function computeUtilityScore({ localLossBefore, localLossAfter, dataSize,
   const entropyScore = labelEntropy(labelDistribution);
 
   const score = 0.5 * lossImprovement + 0.3 * dataSizeScore + 0.2 * entropyScore;
+  if (!Number.isFinite(score)) return null;
   return Math.max(0, Math.min(1, Number(score.toFixed(4))));
 }
 

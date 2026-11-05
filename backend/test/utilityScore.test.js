@@ -49,6 +49,35 @@ test('computeUtilityScore approaches 1 for a perfect update', () => {
   assert.equal(score, 1);
 });
 
+test('labelEntropy ignores infinite counts', () => {
+  assert.equal(labelEntropy({ 0: Infinity, 1: 10 }), 0);
+  assert.equal(labelEntropy({ 0: Infinity, 1: 10, 2: 10 }), 1);
+});
+
+test('computeUtilityScore returns null instead of NaN for non-finite losses', () => {
+  const base = { localLossBefore: 2, localLossAfter: 1, dataSize: 100, labelDistribution: { 0: 5 } };
+  for (const bad of [NaN, Infinity, -Infinity]) {
+    assert.equal(computeUtilityScore({ ...base, localLossAfter: bad }), null);
+    assert.equal(computeUtilityScore({ ...base, localLossBefore: bad }), null);
+  }
+});
+
+test('computeUtilityScore returns null for negative losses, bad sizes or bad label counts', () => {
+  const base = { localLossBefore: 2, localLossAfter: 1, dataSize: 100, labelDistribution: { 0: 5 } };
+  assert.equal(computeUtilityScore({ ...base, localLossAfter: -1 }), null);
+  assert.equal(computeUtilityScore({ ...base, dataSize: -5 }), null);
+  assert.equal(computeUtilityScore({ ...base, dataSize: NaN }), null);
+  assert.equal(computeUtilityScore({ ...base, labelDistribution: { 0: Infinity, 1: 3 } }), null);
+  assert.equal(computeUtilityScore({ ...base, labelDistribution: { 0: NaN } }), null);
+  assert.equal(computeUtilityScore({ ...base, labelDistribution: { 'a.b': 1 } }), null);
+});
+
+test('a null score can never pass a threshold check', () => {
+  const score = computeUtilityScore({ localLossBefore: 2, localLossAfter: NaN, dataSize: 100, labelDistribution: {} });
+  assert.equal(score, null);
+  assert.notEqual(typeof score, 'number');
+});
+
 test('computeUtilityScore stays within [0, 1] and is rounded to 4 decimals', () => {
   for (const [before, after, n] of [[1, 0.3, 37], [5, 4.2, 1200], [0.7, 0.69, 3]]) {
     const s = computeUtilityScore({ localLossBefore: before, localLossAfter: after, dataSize: n, labelDistribution: { 0: 2, 1: 5 } });

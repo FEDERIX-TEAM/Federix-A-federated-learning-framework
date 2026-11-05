@@ -19,6 +19,7 @@ import {
 } from '../../utils/protoMappers.js';
 import { authOf, getActiveConfig, clampN, parseDate, num, joinedCount, giniCoefficient } from '../lib/helpers.js';
 import { invalidArg, notFound, failedPrecondition } from '../lib/errors.js';
+import { requireFinite } from '../lib/validate.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 
 const CLIENT_SORT_FIELDS = ['created_at', 'name', 'last_seen', 'rounds_participated', 'utility_avg', 'status'];
@@ -351,7 +352,11 @@ export function createAdminService() {
       };
 
       const diff = {};
-      for (const [k, v] of Object.entries(fields)) if (v !== undefined) diff[column[k]] = v;
+      for (const [k, v] of Object.entries(fields)) {
+        if (v === undefined) continue;
+        requireFinite(v, column[k]);
+        diff[column[k]] = v;
+      }
       if (Object.keys(diff).length === 0) throw invalidArg('No config fields supplied');
 
       const current = (await getActiveConfig()).toObject();
