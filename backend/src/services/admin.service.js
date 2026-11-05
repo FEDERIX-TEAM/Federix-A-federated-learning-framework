@@ -204,18 +204,25 @@ export function createAdminService() {
         Round.findOne().sort({ round_number: -1 }),
       ]);
 
-      const round = await Round.create({
-        round_id: newId(),
-        round_number: (lastRound?.round_number || 0) + 1,
-        status: 'active',
-        max_clients: maxClients,
-        min_clients: config.min_clients_per_round,
-        deadline_seconds: deadlineSeconds,
-        deadline_at: new Date(Date.now() + deadlineSeconds * 1000),
-        notes: req.notes,
-        config_snapshot: config.toObject(),
-        model_version_before: latestModel?.model_version ?? null,
-      });
+      let round;
+      try {
+        round = await Round.create({
+          round_id: newId(),
+          round_number: (lastRound?.round_number || 0) + 1,
+          running: true,
+          status: 'active',
+          max_clients: maxClients,
+          min_clients: config.min_clients_per_round,
+          deadline_seconds: deadlineSeconds,
+          deadline_at: new Date(Date.now() + deadlineSeconds * 1000),
+          notes: req.notes,
+          config_snapshot: config.toObject(),
+          model_version_before: latestModel?.model_version ?? null,
+        });
+      } catch (err) {
+        if (err?.code === 11000) throw failedPrecondition('Another round was started at the same time; only one round can run');
+        throw err;
+      }
 
       await logEvent({ actor: authOf(ctx).sub, eventType: 'round.started', details: { round_id: round.round_id } });
       publish('round_started', {
@@ -238,7 +245,10 @@ export function createAdminService() {
       round.aborted_reason = req.reason || null;
       round.completed_at = new Date();
       await round.save();
-      await Update.updateMany({ round_id: round.round_id, status: 'pending' }, { status: 'rejected', reason: 'round aborted' });
+      await Update.updateMany(
+        { round_id: round.round_id, status: { $in: ['pending', 'accepted', 'compressed'] } },
+        { status: 'rejected', reason: 'round aborted' }
+      );
 
       publish('round_aborted', { round_id: round.round_id, reason: req.reason }, ADMIN_AND_CLIENTS);
       await logEvent({ actor: authOf(ctx).sub, eventType: 'round.aborted', details: { round_id: round.round_id, reason: req.reason } });

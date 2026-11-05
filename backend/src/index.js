@@ -11,6 +11,7 @@ import { buildInterceptors } from './interceptors.js';
 import { registerStorageRoute } from './storage.js';
 import { startHeartbeatWatcher } from './heartbeatWatcher.js';
 import { getActiveConfig } from './lib/helpers.js';
+import { ensureRoundIndexes } from '../models/Round.js';
 
 import { AuthService } from './gen/auth_pb.js';
 import { ClientService } from './gen/client_pb.js';
@@ -52,6 +53,7 @@ async function main() {
   const redis = await createRedisClient(logger);
 
   await getActiveConfig();
+  await ensureRoundIndexes();
 
   await app.register(cors, {
     origin: true,

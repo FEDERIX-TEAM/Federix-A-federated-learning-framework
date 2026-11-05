@@ -64,34 +64,65 @@ export function createClientService() {
       if (existing?.status === 'joined') {
         return { accepted: true, modelDownloadUrl: modelUrl(round.model_version_before), instructions: 'Already joined this round' };
       }
-      if (joinedCount(round) >= round.max_clients) {
-        return { accepted: false, modelDownloadUrl: '', instructions: 'Round is at capacity (max_clients reached)' };
-      }
 
-      const participant = {
-        client_id: client.client_id,
+      const now = new Date();
+      const joinable = {
+        round_id: round.round_id,
+        status: 'active',
+        deadline_at: { $gt: now },
+        $expr: {
+          $lt: [
+            { $size: { $filter: { input: '$participants', cond: { $eq: ['$$this.status', 'joined'] } } } },
+            '$max_clients',
+          ],
+        },
+      };
+      const fields = {
         local_data_size: req.localDataSize || null,
         device_info: stringMapToPlain(req.deviceInfo),
         status: 'joined',
-        joined_at: new Date(),
-        last_heartbeat_at: new Date(),
+        joined_at: now,
+        last_heartbeat_at: now,
+        left_at: null,
+        leave_reason: null,
+        missed_heartbeats: 0,
       };
-      if (existing) Object.assign(existing, participant, { left_at: null, leave_reason: null, missed_heartbeats: 0 });
-      else round.participants.push(participant);
-      await round.save();
 
-      client.rounds_participated += 1;
-      client.status = 'active';
-      client.last_seen = new Date();
-      await client.save();
+      const updated = existing
+        ? await Round.findOneAndUpdate(
+          { ...joinable, participants: { $elemMatch: { client_id: client.client_id, status: { $ne: 'joined' } } } },
+          { $set: Object.fromEntries(Object.entries(fields).map(([k, v]) => [`participants.$[p].${k}`, v])) },
+          { arrayFilters: [{ 'p.client_id': client.client_id }], returnDocument: 'after' }
+        )
+        : await Round.findOneAndUpdate(
+          { ...joinable, 'participants.client_id': { $ne: client.client_id } },
+          { $push: { participants: { client_id: client.client_id, ...fields } } },
+          { returnDocument: 'after' }
+        );
+
+      if (!updated) {
+        const fresh = await Round.findOne({ round_id: round.round_id });
+        if (fresh?.participants.some((p) => p.client_id === client.client_id && p.status === 'joined')) {
+          return { accepted: true, modelDownloadUrl: modelUrl(fresh.model_version_before), instructions: 'Already joined this round' };
+        }
+        if (!fresh || fresh.status !== 'active') {
+          return { accepted: false, modelDownloadUrl: '', instructions: `Round is ${fresh?.status ?? 'gone'}, not accepting joins` };
+        }
+        if (new Date() > fresh.deadline_at) {
+          return { accepted: false, modelDownloadUrl: '', instructions: 'Round deadline has passed' };
+        }
+        return { accepted: false, modelDownloadUrl: '', instructions: 'Round is at capacity (max_clients reached)' };
+      }
+
+      await Client.updateOne({ client_id: client.client_id }, { status: 'active', last_seen: now });
 
       publish('round_client_joined', {
-        round_id: round.round_id,
+        round_id: updated.round_id,
         client_id: client.client_id,
-        participant_count: joinedCount(round),
+        participant_count: joinedCount(updated),
       }, ADMIN_ROLES);
 
-      return { accepted: true, modelDownloadUrl: modelUrl(round.model_version_before), instructions: 'Begin local training' };
+      return { accepted: true, modelDownloadUrl: modelUrl(updated.model_version_before), instructions: 'Begin local training' };
     },
 
     async leaveRound(req, ctx) {
@@ -150,6 +181,7 @@ export function createClientService() {
       const round = await Round.findOne({ round_id: req.roundId });
       if (!round) throw notFound('Round not found');
       if (round.status !== 'active') throw failedPrecondition(`Round is ${round.status}, not accepting updates`);
+      if (new Date() > round.deadline_at) throw failedPrecondition('Round deadline has passed, not accepting updates');
 
       const participant = round.participants.find((p) => p.client_id === clientId && p.status === 'joined');
       if (!participant) throw permissionDenied('Client is not an active participant in this round');

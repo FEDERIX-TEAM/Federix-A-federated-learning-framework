@@ -50,6 +50,17 @@ const roundSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
+export const RUNNING_STATUSES = ['active', 'aggregating'];
+
+roundSchema.add({ running: { type: Boolean, default: undefined } });
+roundSchema.index({ running: 1 }, { unique: true, partialFilterExpression: { running: true }, name: 'one_running_round' });
+roundSchema.index({ round_number: 1 }, { unique: true, name: 'unique_round_number' });
+
+roundSchema.pre('save', function syncRunningFlag() {
+  if (RUNNING_STATUSES.includes(this.status)) this.running = true;
+  else this.running = undefined;
+});
+
 roundSchema.virtual('participant_count').get(function participantCount() {
   return this.participants.filter((p) => p.status === 'joined').length;
 });
@@ -57,3 +68,14 @@ roundSchema.virtual('participant_count').get(function participantCount() {
 roundSchema.set('toJSON', { virtuals: true });
 
 export const Round = mongoose.model('Round', roundSchema);
+
+export async function ensureRoundIndexes() {
+  await Round.updateMany({ status: { $nin: RUNNING_STATUSES }, running: { $exists: true } }, { $unset: { running: 1 } });
+  const running = await Round.find({ status: { $in: RUNNING_STATUSES } }).select('round_id status').lean();
+  if (running.length > 1) {
+    const list = running.map((r) => `${r.round_id} (${r.status})`).join(', ');
+    throw new Error(`More than one round is running: ${list}. Stop all but one before starting the server.`);
+  }
+  await Round.updateMany({ status: { $in: RUNNING_STATUSES } }, { $set: { running: true } });
+  await Round.createIndexes();
+}
