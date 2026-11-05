@@ -6,8 +6,13 @@
   "main": "src/index.js",
   "scripts": {
     "generate": "buf generate",
+    "check:services": "node scripts/check-services.js",
+    "prestart": "npm run check:services",
     "start": "node src/index.js",
+    "predev": "npm run check:services",
     "dev": "node --watch src/index.js",
+    "pretest": "npm run check:services",
+    "test": "node --test test/*.test.js",
     "seed:super-admin": "node scripts/seed-super-admin.js",
     "smoke": "node scripts/smoke-test.js"
   },
