@@ -1,12 +1,11 @@
+import { config } from '../../config/index.js';
+
 // In-process pub/sub that backs EventStreamService.Subscribe (replaces the old WebSocket manager).
 // NOTE: single-instance only. To scale horizontally, back publish()/subscribe() with Redis pub/sub.
 
 export const ADMIN_ROLES = ['super_admin', 'admin', 'fl_engineer', 'viewer'];
 export const ADMIN_AND_CLIENTS = [...ADMIN_ROLES, 'sdk_client'];
 export const ALL = 'all';
-
-const PING_INTERVAL_MS = 30_000;
-const MAX_QUEUE = 1000;
 
 const subscribers = new Set();
 
@@ -29,7 +28,7 @@ export async function* subscribe(user, signal) {
   const sub = {
     user,
     push(event) {
-      if (queue.length >= MAX_QUEUE) queue.shift(); // drop oldest for slow consumers
+      if (queue.length >= config.events.queueMax) queue.shift(); // drop oldest for slow consumers
       queue.push(event);
       wake?.();
     },
@@ -50,7 +49,7 @@ export async function* subscribe(user, signal) {
         let timer;
         await new Promise((resolve) => {
           wake = resolve;
-          timer = setTimeout(resolve, PING_INTERVAL_MS);
+          timer = setTimeout(resolve, config.events.pingIntervalMs);
         });
         clearTimeout(timer);
         wake = null;

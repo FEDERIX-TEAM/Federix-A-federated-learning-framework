@@ -2,15 +2,12 @@ import mongoose from 'mongoose';
 import Redis from 'ioredis';
 import { config } from './config/index.js';
 
-const CONNECT_TIMEOUT_MS = 3000;
-const REDIS_MAX_BACKOFF_MS = 2000;
-
 export async function connectMongo(logger) {
   mongoose.set('strictQuery', true);
   mongoose.set('bufferCommands', false);
 
   try {
-    await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: CONNECT_TIMEOUT_MS });
+    await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: config.db.connectTimeoutMs });
   } catch (err) {
     throw new Error(`MongoDB is not reachable at ${config.mongoUri}: ${err.message}`);
   }
@@ -20,13 +17,13 @@ export async function connectMongo(logger) {
   mongoose.connection.on('reconnected', () => logger.info('MongoDB reconnected'));
 }
 
-export const redisBackoff = (attempt) => Math.min(attempt * 200, REDIS_MAX_BACKOFF_MS);
+export const redisBackoff = (attempt) => Math.min(attempt * config.db.redisBackoffStepMs, config.db.redisMaxBackoffMs);
 
 export async function createRedisClient(logger) {
   const client = new Redis(config.redisUrl, {
     lazyConnect: true,
-    connectTimeout: CONNECT_TIMEOUT_MS,
-    maxRetriesPerRequest: 3,
+    connectTimeout: config.db.connectTimeoutMs,
+    maxRetriesPerRequest: config.db.redisMaxRetriesPerRequest,
     retryStrategy: redisBackoff,
   });
 

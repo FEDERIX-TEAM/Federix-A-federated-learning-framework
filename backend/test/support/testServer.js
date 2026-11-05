@@ -90,7 +90,7 @@ export async function runServerUntilExit(envOverrides, timeoutMs = STARTUP_TIMEO
   return { code, signal, output: output.join('') };
 }
 
-export async function startTestServer() {
+export async function startTestServer({ env = {} } = {}) {
   const suffix = `${process.pid}_${randomBytes(4).toString('hex')}`;
   const dbName = `federix_test_${suffix}`;
   const mongoUri = withPath(config.mongoUri, `/${dbName}`);
@@ -125,6 +125,7 @@ export async function startTestServer() {
       FL_SERVER_ALLOWED_IPS: '127.0.0.1,::1,::ffff:127.0.0.1',
       STORAGE_DIR: storageDir,
       LOG_LEVEL: 'warn',
+      ...env,
     },
     stdio: ['ignore', 'ignore', 'pipe'],
   });

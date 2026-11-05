@@ -1,7 +1,8 @@
 import { invalidArg } from './errors.js';
+import { config } from '../../config/index.js';
 
-export const MAX_LABEL_CLASSES = 1000;
-export const MAX_LABEL_KEY_LENGTH = 64;
+export const MAX_LABEL_CLASSES = config.limits.maxLabelClasses;
+export const MAX_LABEL_KEY_LENGTH = config.limits.maxLabelKeyLength;
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 

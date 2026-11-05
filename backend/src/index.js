@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import { fastifyConnectPlugin } from '@connectrpc/connect-fastify';
 import { cors as connectCors } from '@connectrpc/connect';
 
-import { config, assertProductionSecrets } from '../config/index.js';
+import { config, assertValidConfig, assertProductionSecrets } from '../config/index.js';
 import { connectMongo, createRedisClient } from '../db.js';
 import { buildInterceptors } from './interceptors.js';
 import { registerStorageRoute } from './storage.js';
@@ -32,19 +32,21 @@ import { createEventService } from './services/events.service.js';
 //   HTTP2=true         HTTP/2 cleartext (h2c) -> native gRPC clients (grpcio, grpc-java, grpcurl -plaintext) work.
 //   TLS_KEY + TLS_CERT HTTP/2 over TLS with HTTP/1.1 fallback (recommended for production).
 function buildServerOptions() {
-  const base = { logger: { level: process.env.LOG_LEVEL || 'info' } };
-  if (process.env.TLS_KEY && process.env.TLS_CERT) {
+  const base = { logger: { level: config.logLevel } };
+  const { tlsKey, tlsCert, http2 } = config.server;
+  if (tlsKey && tlsCert) {
     return {
       ...base,
       http2: true,
-      https: { allowHTTP1: true, key: fs.readFileSync(process.env.TLS_KEY), cert: fs.readFileSync(process.env.TLS_CERT) },
+      https: { allowHTTP1: true, key: fs.readFileSync(tlsKey), cert: fs.readFileSync(tlsCert) },
     };
   }
-  if (process.env.HTTP2 === 'true') return { ...base, http2: true };
+  if (http2) return { ...base, http2: true };
   return base;
 }
 
 async function main() {
+  assertValidConfig();
   assertProductionSecrets();
   const app = Fastify(buildServerOptions());
   const logger = app.log;

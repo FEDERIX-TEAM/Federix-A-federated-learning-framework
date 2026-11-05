@@ -67,7 +67,7 @@ export function createSystemService({ redis }) {
       if (enabled) {
         const details = { message, estimated_duration_minutes: req.estimatedDurationMinutes ?? null };
         // Auto-expires after 24h as a safety net so a forgotten flag can't lock clients out forever.
-        await redis.set('system:maintenance', JSON.stringify(details), 'EX', 86400);
+        await redis.set('system:maintenance', JSON.stringify(details), 'EX', config.maintenance.ttlSeconds);
       } else {
         await redis.del('system:maintenance');
       }

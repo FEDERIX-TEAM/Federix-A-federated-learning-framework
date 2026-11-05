@@ -65,6 +65,58 @@ curl -s -X POST localhost:4000/federix.v1.AdminService/GetOverview \
 ```
 JSON field names are lowerCamelCase (`clientId`, `apiKey`). Server-streaming RPCs return a stream of messages.
 
+## Configuration
+
+Every server setting comes from an environment variable (or `.env`) and is read in one place, `config/index.js`.
+Values are validated at startup: if any value is invalid, the server refuses to start and lists every problem.
+`.env.example` lists every variable with its default. With `NODE_ENV=production`, the server also refuses
+default, short or identical secrets.
+
+Federated-learning behaviour (FedProx `mu`, epochs, batch size, client limits, utility thresholds, compression)
+is not set here. It lives in `SystemConfig` in MongoDB, is changed at runtime with `AdminService.UpdateConfig`,
+and is frozen per round in `config_snapshot`.
+
+| Variable | Default | Range | What it controls |
+|---|---|---|---|
+| `NODE_ENV` | `development` | | `production` turns on the secret checks |
+| `PORT` / `HOST` | `4000` / `0.0.0.0` | 1–65535 | Listen address |
+| `LOG_LEVEL` | `info` | fatal … trace, silent | Server log level |
+| `HTTP2` | `false` | true/false | HTTP/2 cleartext for native gRPC clients |
+| `TLS_KEY` / `TLS_CERT` | unset | both or neither | HTTP/2 over TLS with HTTP/1.1 fallback |
+| `MONGO_URI` / `REDIS_URL` | local defaults | | Required services; the server will not start without them |
+| `DB_CONNECT_TIMEOUT_MS` | `3000` | ≥ 100 | Startup connection timeout for MongoDB and Redis |
+| `REDIS_BACKOFF_STEP_MS` / `REDIS_MAX_BACKOFF_MS` | `200` / `2000` | ≥ 0 | Redis reconnect delay: step × attempt, capped |
+| `REDIS_MAX_RETRIES_PER_REQUEST` | `3` | ≥ 0 | Retries for a Redis command during an outage |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev values | | Token signing secrets |
+| `JWT_ACCESS_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | `15m` / `7d` | number + s/m/h/d | Token lifetimes |
+| `BCRYPT_ROUNDS` | `10` | 4–15 | Cost of password and API-key hashes |
+| `MIN_SECRET_LENGTH` | `32` | ≥ 16 | Minimum secret length in production |
+| `MIN_PASSWORD_LENGTH` | `8` | ≥ 6 | Minimum admin password length |
+| `INTERNAL_SERVICE_TOKEN` | dev value | | Shared secret for the FL server |
+| `FL_SERVER_ALLOWED_IPS` | loopback | comma list | IPs allowed to use the internal token |
+| `STORAGE_DIR` | `./storage` | | Folder served by signed `/storage/...` URLs |
+| `SIGNED_URL_SECRET` | dev value | | HMAC secret for signed URLs |
+| `SIGNED_URL_TTL_SECONDS` | `600` | ≥ 1 | Lifetime of signed download URLs |
+| `MAX_UPDATE_SIZE_MB` | `256` | ≥ 1 | Maximum update size reported to clients |
+| `HEARTBEAT_CHECK_INTERVAL_MS` | `30000` | ≥ 100 | How often missed heartbeats are checked |
+| `HEARTBEAT_TIMEOUT_MS` | `90000` | ≥ 100 | Silence after which a participant is dropped |
+| `EVENT_PING_INTERVAL_MS` | `30000` | ≥ 100 | Keep-alive ping on the event stream |
+| `EVENT_QUEUE_MAX` | `1000` | ≥ 1 | Queued events per slow subscriber before the oldest are dropped |
+| `MAINTENANCE_TTL_SECONDS` | `86400` | ≥ 1 | Maintenance mode switches itself off after this |
+| `MAX_LABEL_CLASSES` / `MAX_LABEL_KEY_LENGTH` | `1000` / `64` | ≥ 1 | Limits on a submitted label distribution |
+| `PAGE_SIZE_DEFAULT` / `PAGE_SIZE_MAX` | `20` / `200` | default ≤ max | Paging for client and round lists |
+| `METRICS_ROUNDS_DEFAULT` / `METRICS_ROUNDS_MAX` | `20` / `200` | default ≤ max | Rounds returned by metrics RPCs |
+| `CLIENT_METRICS_SCAN_FACTOR` | `50` | ≥ 1 | Updates scanned per round in `GetClientMetrics` |
+| `CLIENT_HISTORY_LIMIT` | `50` | ≥ 1 | History entries in `GetClientDetail` |
+| `CONFIG_HISTORY_LIMIT` | `100` | ≥ 1 | Entries in `GetConfigHistory` |
+| `LOGS_LIMIT_DEFAULT` / `LOGS_LIMIT_MAX` | `100` / `500` | default ≤ max | Entries in `GetLogs` |
+| `SELF_METRICS_LIMIT_DEFAULT` / `SELF_METRICS_LIMIT_MAX` | `10` / `100` | default ≤ max | Entries in client `GetSelfMetrics` |
+| `UTILITY_AVG_WINDOW` | `200` | ≥ 1 | Recent updates used for a client's utility average |
+| `METRICS_WINDOW_MS` / `METRICS_MAX_SAMPLES` | `60000` / `50000` | ≥ 1000 / ≥ 100 | Request-rate window in `GetStats` |
+| `AGGREGATION_BASE_MS` / `AGGREGATION_PER_UPDATE_MS` | `5000` / `800` | ≥ 0 | `TriggerRound` duration estimate |
+| `SUPPORTED_SDK_VERSIONS` | `1.0.0,1.1.0` | comma list | Versions reported to SDKs |
+| `SERVER_TIMEZONE` / `BUILD_ID` | `Asia/Kolkata` / `dev-local` | | Reported by `GetPublicConfig` / `GetVersion` |
+
 ## Auth model
 
 - **SDK clients:** `Register` → `client_id` + `api_key` (shown once) → `ClientLogin` → JWT with role `sdk_client`. Every `ClientService` call is scoped to the `client_id` in the token.

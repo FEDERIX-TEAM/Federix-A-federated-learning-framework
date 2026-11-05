@@ -1,11 +1,8 @@
 import { Round } from '../models/Round.js';
 import { publish, ADMIN_ROLES } from './lib/events.js';
+import { config } from '../config/index.js';
 
-const CHECK_INTERVAL_MS = 30_000;
-const TIMEOUT_MS = 90_000; // 3 missed 30s beats
-
-/** Marks participants as 'dropped' after 3 missed heartbeats. Returns a stop() function. */
-export function startHeartbeatWatcher(logger) {
+export function startHeartbeatWatcher(logger, { checkIntervalMs, timeoutMs } = config.heartbeat) {
   const timer = setInterval(async () => {
     try {
       const rounds = await Round.find({ status: 'active' });
@@ -14,7 +11,7 @@ export function startHeartbeatWatcher(logger) {
         for (const p of round.participants) {
           if (p.status !== 'joined') continue;
           const last = (p.last_heartbeat_at ?? p.joined_at).getTime();
-          if (Date.now() - last > TIMEOUT_MS) {
+          if (Date.now() - last > timeoutMs) {
             p.status = 'dropped';
             p.left_at = new Date();
             p.leave_reason = 'missed heartbeats';
@@ -27,7 +24,7 @@ export function startHeartbeatWatcher(logger) {
     } catch (err) {
       logger.error({ err }, 'heartbeat watcher failed');
     }
-  }, CHECK_INTERVAL_MS);
+  }, checkIntervalMs);
   timer.unref();
   return () => clearInterval(timer);
 }
