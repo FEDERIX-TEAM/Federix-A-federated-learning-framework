@@ -133,10 +133,10 @@ export function createFlBridgeService() {
           labelDistribution: u.label_distribution,
         });
         let level = 'none';
-        if (score < config.utility_threshold_low) level = 'full';
+        if (score === null || score < config.utility_threshold_low) level = 'full';
         else if (score < config.utility_threshold_high) level = 'partial';
 
-        yield { updateId: u.update_id, utilityScore: score, compressionLevel: COMPRESSION_LEVEL_TO_PROTO[level] };
+        yield { updateId: u.update_id, utilityScore: num(score), compressionLevel: COMPRESSION_LEVEL_TO_PROTO[level] };
       }
     },
 

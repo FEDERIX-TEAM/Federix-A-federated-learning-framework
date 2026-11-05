@@ -99,6 +99,8 @@ async function main() {
   check('GetConfig as viewer', cfg.minClientsPerRound >= 1);
   await expectCode('UpdateConfig as admin -> PermissionDenied', Code.PermissionDenied, () => admin.updateConfig({ mu: 0.5 }, adminUser));
   await expectCode('UpdateConfig invalid -> InvalidArgument', Code.InvalidArgument, () => admin.updateConfig({ utilityThresholdLow: 0.9, utilityThresholdHigh: 0.1 }, SA));
+  await expectCode('UpdateConfig NaN mu -> InvalidArgument', Code.InvalidArgument, () => admin.updateConfig({ mu: NaN }, SA));
+  await expectCode('UpdateConfig Infinity threshold -> InvalidArgument', Code.InvalidArgument, () => admin.updateConfig({ utilityThresholdHigh: Infinity }, SA));
   const upd = await admin.updateConfig({ minClientsPerRound: 2, utilityThresholdLow: 0.05, utilityThresholdHigh: 0.5, mu: 0.02 }, SA);
   check('UpdateConfig', upd.updatedConfig.minClientsPerRound === 2 && upd.updatedConfig.mu === 0.02);
   check('GetConfigHistory', (await collect(admin.getConfigHistory({}, adminUser))).length >= 1);
@@ -148,6 +150,16 @@ async function main() {
   check('SubmitUpdate good -> accepted', s0.accepted && !s0.compressionRequired);
   check('SubmitUpdate mediocre -> compression_required', s1.accepted && s1.compressionRequired);
   check('SubmitUpdate poor -> rejected', s2.accepted === false);
+  await expectCode('SubmitUpdate NaN loss -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, NaN, 200, { a: 100 }));
+  await expectCode('SubmitUpdate Infinity loss -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], Infinity, 0.5, 200, { a: 100 }));
+  await expectCode('SubmitUpdate Infinity label count -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, 0.5, 200, { a: Infinity, b: 3 }));
+  await expectCode('SubmitUpdate negative label count -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, 0.5, 200, { a: -1 }));
+  await expectCode('SubmitUpdate dotted label key -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, 0.5, 200, { 'a.b': 1 }));
+  await expectCode('SubmitUpdate negative training time -> InvalidArgument', Code.InvalidArgument, () => client.submitUpdate({
+    roundId: start.roundId, deltaWeightsUrl: 's3://bucket/x.bin', localLossBefore: 1, localLossAfter: 0.5,
+    labelDistribution: { counts: { a: 1 } }, dataSize: 10, trainingTimeMs: -1,
+  }, clients[1]));
+  check('Rejected NaN submit did not overwrite the stored update', (await client.getUpdateStatus({ roundId: start.roundId }, clients[1])).status === UpdateStatus.COMPRESSED);
   const s0b = await submit(clients[0], 1.0, 0.2, 5000, { a: 100, b: 100, c: 100 });
   check('Resubmit keeps update_id', s0b.updateId === s0.updateId);
   const st = await client.getUpdateStatus({ roundId: start.roundId }, clients[0]);

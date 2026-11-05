@@ -8,6 +8,7 @@ import { computeUtilityScore } from '../../utils/utilityScore.js';
 import { dateToIso, UPDATE_STATUS_TO_PROTO, stringMapToPlain, labelDistributionFromMessage } from '../../utils/protoMappers.js';
 import { authOf, getActiveConfig, clampN, joinedCount, num } from '../lib/helpers.js';
 import { invalidArg, notFound, permissionDenied, failedPrecondition } from '../lib/errors.js';
+import { requireFinite, requireLabelDistribution } from '../lib/validate.js';
 import { publish, ADMIN_ROLES } from '../lib/events.js';
 
 const modelUrl = (version) => (version == null ? '' : signedUrl.sign(`/models/${version}`).url);
@@ -137,8 +138,11 @@ export function createClientService() {
     async submitUpdate(req, ctx) {
       const clientId = clientIdOf(ctx);
       if (!req.roundId || !req.deltaWeightsUrl) throw invalidArg('round_id and delta_weights_url are required');
-      if (req.dataSize <= 0) throw invalidArg('data_size must be > 0');
-      if (req.localLossBefore < 0 || req.localLossAfter < 0) throw invalidArg('local losses must be >= 0');
+      requireFinite(req.dataSize, 'data_size', { min: 1 });
+      requireFinite(req.localLossBefore, 'local_loss_before', { min: 0 });
+      requireFinite(req.localLossAfter, 'local_loss_after', { min: 0 });
+      requireFinite(req.trainingTimeMs, 'training_time_ms', { min: 0 });
+      const labelDistribution = requireLabelDistribution(labelDistributionFromMessage(req.labelDistribution));
 
       const client = await loadClient(ctx);
       if (client.isBanned()) throw permissionDenied('Client is banned from participating');
@@ -151,7 +155,6 @@ export function createClientService() {
       if (!participant) throw permissionDenied('Client is not an active participant in this round');
 
       const config = await getActiveConfig();
-      const labelDistribution = labelDistributionFromMessage(req.labelDistribution);
       const utility = computeUtilityScore({
         localLossBefore: req.localLossBefore,
         localLossAfter: req.localLossAfter,
@@ -163,7 +166,10 @@ export function createClientService() {
       let compressionRequired = false;
       let compressionLevel = 'none';
       let reason = null;
-      if (utility < config.utility_threshold_low) {
+      if (utility === null) {
+        status = 'rejected';
+        reason = 'utility score could not be computed from the submitted metrics';
+      } else if (utility < config.utility_threshold_low) {
         status = 'rejected';
         reason = `utility score ${utility} below minimum threshold ${config.utility_threshold_low}`;
       } else if (utility < config.utility_threshold_high) {
