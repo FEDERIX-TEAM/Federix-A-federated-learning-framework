@@ -153,7 +153,8 @@ async function main() {
     check(`JoinRound ${c.id.slice(0, 6)}`, j.accepted === true);
   }
   check('Heartbeat', (await client.heartbeat({ roundId: start.roundId }, clients[0])).ok);
-  check('Client GetStatus', (await client.getStatus({}, clients[0])).roundCount >= 1);
+  const roundCountBefore = (await client.getStatus({}, clients[0])).roundCount;
+  check('Client GetStatus (joining does not count as participation)', typeof roundCountBefore === 'number');
   const lv = await client.leaveRound({ roundId: start.roundId, reason: 'test' }, clients[2]);
   check('LeaveRound', lv.success && lv.remainingParticipants === 2);
   await expectCode('LeaveRound again -> FailedPrecondition', Code.FailedPrecondition, () => client.leaveRound({ roundId: start.roundId }, clients[2]));
@@ -223,6 +224,8 @@ async function main() {
   await expectCode('SubmitUpdate while aggregating -> FailedPrecondition', Code.FailedPrecondition, () => submit(clients[0], 1, 0.5, 100, {}));
   const done = await fl.completeRound({ roundId: start.roundId, newModelVersion: 1000 + Math.floor(Math.random() * 1e6), modelUrl: 's3://m/v1.bin', globalLoss: 0.42, globalAccuracy: 0.87 }, internal);
   check('CompleteRound', done.success && !!done.modelId);
+  check('CompleteRound credits participation to contributors', (await client.getStatus({}, clients[0])).roundCount === roundCountBefore + 1);
+  check('CompleteRound does not credit rejected updates', (await client.getStatus({}, clients[2])).roundCount === 0);
   const pushVersion = 2000000 + Math.floor(Math.random() * 1e6);
   const push = await fl.pushModel({ modelVersion: pushVersion, weightsUrl: 's3://m/extra.bin', metrics: { globalLoss: 0.4, globalAccuracy: 0.9 } }, internal);
   check('PushModel', push.stored && !!push.modelId);

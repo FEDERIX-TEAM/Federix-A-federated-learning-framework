@@ -1,5 +1,6 @@
 import { Round } from '../../models/Round.js';
 import { Update } from '../../models/Update.js';
+import { Client } from '../../models/Client.js';
 import { GlobalModel } from '../../models/GlobalModel.js';
 import { config as appConfig } from '../../config/index.js';
 import { newId } from '../../utils/ids.js';
@@ -65,6 +66,11 @@ export function createFlBridgeService() {
       round.global_accuracy = req.globalAccuracy;
       round.completed_at = new Date();
       await round.save();
+
+      const contributors = await Update.distinct('client_id', { round_id: req.roundId, status: { $in: ['accepted', 'compressed'] } });
+      if (contributors.length) {
+        await Client.updateMany({ client_id: { $in: contributors } }, { $inc: { rounds_participated: 1 } });
+      }
 
       publish('round_completed', {
         round_id: req.roundId,
