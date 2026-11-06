@@ -40,10 +40,19 @@ Unknown setting names are refused. Defaults match the central server's `SystemCo
 | `reject_below` | 0 | Updates with utility below this are rejected; 0 never rejects (the paper's behaviour) |
 | `tau_high` / `tau_low` / `ratios` | 0.8 / 0.2 / (1.0, 0.5, 0.1) | Compression tiers |
 | `temperature` | 1.0 | Utility-weighted aggregation |
+| `compression` / `error_feedback` | true / true | Top-k compression at each tier's ratio, and carrying what was not sent into the next round |
 | `num_threads` / `eval_batch_size` / `seed` | 4 / 1024 / 0 | Runtime and reproducibility |
 | `data_dir` / `log_dir` / `log_level` | data / logs / INFO | Paths and logging |
 
 ## Layout
     src/federix/   config.py  data.py  model.py  fedprox.py  aggregation.py  evaluation.py
-                   interfaces.py  logger.py  main.py  check_setup.py  inspect_data.py
+                   utility.py  compression.py  codec.py  spec.py  interfaces.py  logger.py
+                   main.py  check_setup.py  inspect_data.py
+    src/federix/adapters/pytorch.py   the only framework-specific code: model <-> vector + spec
     tests/         pytest suite (runs on in-memory data, no download needed)
+
+## Framework-neutral weights
+Utility, compression, the codec and the model spec use only Python and NumPy, so any training framework can
+produce and consume updates. A model travels as a flat float32 vector plus a `ModelSpec` (ordered
+`(name, shape, dtype)` with a sha256), encoded in the FXW1 format (`codec.py`, see `spec/codec_vectors.json`).
+Only `adapters/` knows about a framework; PyTorch is the first adapter.

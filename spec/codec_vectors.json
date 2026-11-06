@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "format": "FXW1: magic 'FXW1', kind u8 (1 dense, 2 top-k), dtype u8 (1 float32), reserved u16 = 0, length u64 LE, count u64 LE, spec sha256 (32 bytes); dense body float32[length] LE; top-k body uint32[count] ascending indices then float32[count] values, all LE",
+  "topk_rule": "k = min(n, max(1, floor(ratio*n + 0.5))); pick by descending |value|, ties to the lower index; send indices ascending; dense when ratio >= 1 or 2k >= n; residual = (delta + residual_in) with the sent positions set to 0, all zeros when dense",
+  "spec": {
+    "params": [
+      [
+        "layer.weight",
+        [
+          2,
+          3
+        ]
+      ],
+      [
+        "layer.bias",
+        [
+          3
+        ]
+      ]
+    ],
+    "canonical": "{\"params\":[[\"layer.weight\",[2,3],\"float32\"],[\"layer.bias\",[3],\"float32\"]],\"version\":1}",
+    "sha256": "1fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd0790"
+  },
+  "cases": [
+    {
+      "name": "ratio 1 sends everything dense",
+      "delta": [
+        0.5,
+        -1.25,
+        3.0,
+        0.0,
+        0.125,
+        -2.0,
+        1.0,
+        0.75,
+        -0.5
+      ],
+      "ratio": 1.0,
+      "residual_in": null,
+      "kind": "dense",
+      "indices": null,
+      "values": [
+        0.5,
+        -1.25,
+        3.0,
+        0.0,
+        0.125,
+        -2.0,
+        1.0,
+        0.75,
+        -0.5
+      ],
+      "residual_out": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "encoded_hex": "4658573101010000090000000000000009000000000000001fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd07900000003f0000a0bf00004040000000000000003e000000c00000803f0000403f000000bf",
+      "encoded_size": 92
+    },
+    {
+      "name": "top-k keeps the largest magnitudes, ties go to the lower index",
+      "delta": [
+        0.5,
+        -2.0,
+        2.0,
+        0.25,
+        -0.125,
+        1.0,
+        -1.0,
+        0.0,
+        0.75,
+        2.0
+      ],
+      "ratio": 0.3,
+      "residual_in": null,
+      "kind": "topk",
+      "indices": [
+        1,
+        2,
+        9
+      ],
+      "values": [
+        -2.0,
+        2.0,
+        2.0
+      ],
+      "residual_out": [
+        0.5,
+        0.0,
+        0.0,
+        0.25,
+        -0.125,
+        1.0,
+        -1.0,
+        0.0,
+        0.75,
+        0.0
+      ],
+      "encoded_hex": "46585731020100000a0000000000000003000000000000001fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd0790010000000200000009000000000000c00000004000000040",
+      "encoded_size": 80
+    },
+    {
+      "name": "k rounds half up: 0.25 of 10 keeps 3",
+      "delta": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0
+      ],
+      "ratio": 0.25,
+      "residual_in": null,
+      "kind": "topk",
+      "indices": [
+        7,
+        8,
+        9
+      ],
+      "values": [
+        8.0,
+        9.0,
+        10.0
+      ],
+      "residual_out": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "encoded_hex": "46585731020100000a0000000000000003000000000000001fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd0790070000000800000009000000000000410000104100002041",
+      "encoded_size": 80
+    },
+    {
+      "name": "at least one value is always kept",
+      "delta": [
+        0.0,
+        0.0,
+        -4.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ratio": 0.01,
+      "residual_in": null,
+      "kind": "topk",
+      "indices": [
+        2
+      ],
+      "values": [
+        -4.0
+      ],
+      "residual_out": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "encoded_hex": "46585731020100000c0000000000000001000000000000001fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd079002000000000080c0",
+      "encoded_size": 64
+    },
+    {
+      "name": "half or more falls back to dense",
+      "delta": [
+        1.0,
+        -1.0,
+        2.0,
+        -2.0,
+        3.0,
+        -3.0
+      ],
+      "ratio": 0.5,
+      "residual_in": null,
+      "kind": "dense",
+      "indices": null,
+      "values": [
+        1.0,
+        -1.0,
+        2.0,
+        -2.0,
+        3.0,
+        -3.0
+      ],
+      "residual_out": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "encoded_hex": "4658573101010000060000000000000006000000000000001fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd07900000803f000080bf00000040000000c000004040000040c0",
+      "encoded_size": 80
+    },
+    {
+      "name": "error feedback step 1",
+      "delta": [
+        1.0,
+        0.5,
+        -0.25,
+        0.125,
+        2.0,
+        -0.5,
+        0.0,
+        0.25
+      ],
+      "ratio": 0.25,
+      "residual_in": null,
+      "kind": "topk",
+      "indices": [
+        0,
+        4
+      ],
+      "values": [
+        1.0,
+        2.0
+      ],
+      "residual_out": [
+        0.0,
+        0.5,
+        -0.25,
+        0.125,
+        0.0,
+        -0.5,
+        0.0,
+        0.25
+      ],
+      "encoded_hex": "4658573102010000080000000000000002000000000000001fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd079000000000040000000000803f00000040",
+      "encoded_size": 72
+    },
+    {
+      "name": "error feedback step 2 adds the residual",
+      "delta": [
+        0.5,
+        0.5,
+        -1.5,
+        0.125,
+        0.0,
+        0.25,
+        1.0,
+        -0.25
+      ],
+      "ratio": 0.25,
+      "residual_in": [
+        0.0,
+        0.5,
+        -0.25,
+        0.125,
+        0.0,
+        -0.5,
+        0.0,
+        0.25
+      ],
+      "kind": "topk",
+      "indices": [
+        1,
+        2
+      ],
+      "values": [
+        1.0,
+        -1.75
+      ],
+      "residual_out": [
+        0.5,
+        0.0,
+        0.0,
+        0.25,
+        0.0,
+        -0.25,
+        1.0,
+        0.0
+      ],
+      "encoded_hex": "4658573102010000080000000000000002000000000000001fe85a207b854fea9a3845db3c659a7ccb08013530d4974eca672531ffcd079001000000020000000000803f0000e0bf",
+      "encoded_size": 72
+    }
+  ]
+}
