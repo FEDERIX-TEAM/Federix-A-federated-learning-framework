@@ -66,6 +66,9 @@ export const RBAC_RULES = {
   'AdminService.UpdateUserRole': ['super_admin'],
   'AdminService.DeleteUser': ['super_admin'],
   'AdminService.GetFlServerStatus': ['super_admin', 'admin', 'fl_engineer', 'viewer'],
+  'AdminService.CreateEnrollmentToken': ['super_admin', 'admin'],
+  'AdminService.ListEnrollmentTokens': ['super_admin', 'admin'],
+  'AdminService.RevokeEnrollmentToken': ['super_admin', 'admin'],
 
   // SystemService
   'SystemService.HealthCheck': 'public',

@@ -8,7 +8,7 @@ dashboard API, and a live event stream.
 Connect**) · MongoDB + Mongoose · Redis (token blacklist + maintenance flag; auto-falls back to an
 in-memory stub in dev) · JWT · bcrypt.
 
-All 6 services / 62 RPCs defined in `proto/` are implemented.
+All 6 services / 65 RPCs defined in `proto/` are implemented.
 
 ## Quick start
 
@@ -95,6 +95,10 @@ and is frozen per round in `config_snapshot`.
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | ≥ 1 | Length of a rate-limit window |
 | `RATE_LIMIT_PER_PRINCIPAL` | `1200` | ≥ 1 | Calls per window for one signed-in user or SDK client |
 | `RATE_LIMIT_PER_IP` | `300` | ≥ 1 | Calls per window per IP for public RPCs (login, register, health) |
+| `ENROLLMENT_REQUIRED` | `true` | true/false | `Register` needs an enrolment token created by an admin; `false` allows open registration |
+| `ENROLLMENT_TOKEN_DEFAULT_TTL_HOURS` | `168` | ≥ 1, ≤ max | Lifetime of a token when the admin does not set one |
+| `ENROLLMENT_TOKEN_MAX_TTL_HOURS` | `720` | ≥ 1 | Longest lifetime an admin may give a token |
+| `ENROLLMENT_TOKEN_MAX_USES` | `1000` | ≥ 1 | Most registrations one token may allow |
 | `LOGIN_MAX_ATTEMPTS` | `5` | ≥ 1 | Failed logins for one account before it is locked |
 | `LOGIN_LOCKOUT_SECONDS` | `900` | ≥ 1 | How long a locked account stays locked |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | ≥ 0 | Audit entries older than this are deleted; `0` keeps them forever |
@@ -137,12 +141,12 @@ and is frozen per round in `config_snapshot`.
 | `UTILITY_AVG_WINDOW` | `200` | ≥ 1 | Recent updates used for a client's utility average |
 | `METRICS_WINDOW_MS` / `METRICS_MAX_SAMPLES` | `60000` / `50000` | ≥ 1000 / ≥ 100 | Request-rate window in `GetStats` |
 | `AGGREGATION_BASE_MS` / `AGGREGATION_PER_UPDATE_MS` | `5000` / `800` | ≥ 0 | `TriggerRound` duration estimate |
-| `SUPPORTED_SDK_VERSIONS` | `1.0.0,1.1.0` | comma list | Versions reported to SDKs |
+| `SUPPORTED_SDK_VERSIONS` | `1.0.0,1.1.0` | comma list | SDK versions allowed to register, also reported to SDKs |
 | `SERVER_TIMEZONE` / `BUILD_ID` | `Asia/Kolkata` / `dev-local` | | Reported by `GetPublicConfig` / `GetVersion` |
 
 ## Auth model
 
-- **SDK clients:** `Register` → `client_id` + `api_key` (shown once) → `ClientLogin` → JWT with role `sdk_client`. Every `ClientService` call is scoped to the `client_id` in the token.
+- **SDK clients:** an admin creates an enrolment token (`CreateEnrollmentToken`: label, `max_uses`, `ttl_hours`; the token is shown once and only its sha256 is stored). The client calls `Register` with it → `client_id` + `api_key` (shown once) → `ClientLogin` → JWT with role `sdk_client`. Every `ClientService` call is scoped to the `client_id` in the token. `Register` refuses an `sdk_version` that is not in `SUPPORTED_SDK_VERSIONS`, and a missing, revoked, expired or used-up token; uses are counted atomically, so a token never registers more than `max_uses` clients. Revoking a token stops new registrations only. `ENROLLMENT_REQUIRED=false` allows open registration.
 - **Dashboard users:** `AdminLogin` (email + password) → JWT with role `super_admin | admin | fl_engineer | viewer`. The first `super_admin` comes from the seed script; it can create the rest via `CreateAdminUser`.
 - **FL server ↔ Central Server:** shared secret header + IP allowlist; no JWT.
 - Access tokens are short-lived (15m); `RefreshToken` mints new ones. `Logout` blacklists the token's `jti` in Redis until it expires.
@@ -230,6 +234,9 @@ Generated from `interceptors/rbacRules.js`.
 | UpdateUserRole | super_admin |
 | DeleteUser | super_admin |
 | GetFlServerStatus | super_admin, admin, fl_engineer, viewer |
+| CreateEnrollmentToken | super_admin, admin |
+| ListEnrollmentTokens | super_admin, admin |
+| RevokeEnrollmentToken | super_admin, admin |
 
 #### SystemService
 

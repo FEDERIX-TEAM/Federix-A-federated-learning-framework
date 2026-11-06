@@ -34,6 +34,11 @@ export declare type RegisterRequest = Message<"federix.v1.RegisterRequest"> & {
    * @generated from field: string platform = 4;
    */
   platform: string;
+
+  /**
+   * @generated from field: string enrollment_token = 5;
+   */
+  enrollmentToken: string;
 };
 
 /**

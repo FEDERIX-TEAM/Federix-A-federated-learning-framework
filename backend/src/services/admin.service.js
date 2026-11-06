@@ -24,6 +24,8 @@ import {
 import { authOf, getActiveConfig, configForRound, clampN, parseDate, num, joinedCount, giniCoefficient } from '../lib/helpers.js';
 import { invalidArg, notFound, failedPrecondition } from '../lib/errors.js';
 import { latestFlStatus } from '../lib/flStatus.js';
+import { EnrollmentToken } from '../../models/EnrollmentToken.js';
+import { newEnrollmentToken, hashToken, isActive } from '../lib/enrollment.js';
 import { requireFinite } from '../lib/validate.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 
@@ -577,6 +579,68 @@ export function createAdminService({ redis }) {
       await logEvent({ actor: authOf(ctx).sub, eventType: 'admin.role_changed', details: { user_id: user.user_id, new_role: role } });
 
       return { userId: user.user_id, newRole: ROLE_TO_PROTO[user.role] };
+    },
+
+    async createEnrollmentToken(req, ctx) {
+      const label = (req.label ?? '').trim();
+      if (label.length > 100) throw invalidArg('label must be at most 100 characters');
+      const maxUses = req.maxUses || 1;
+      const ttlHours = req.ttlHours || appConfig.enrollment.defaultTtlHours;
+      if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > appConfig.enrollment.maxUses) {
+        throw invalidArg(`max_uses must be between 1 and ${appConfig.enrollment.maxUses}`);
+      }
+      if (!Number.isInteger(ttlHours) || ttlHours < 1 || ttlHours > appConfig.enrollment.maxTtlHours) {
+        throw invalidArg(`ttl_hours must be between 1 and ${appConfig.enrollment.maxTtlHours}`);
+      }
+
+      const actor = authOf(ctx).sub;
+      const token = newEnrollmentToken();
+      const doc = await EnrollmentToken.create({
+        token_id: newId(),
+        token_hash: hashToken(token),
+        label,
+        max_uses: maxUses,
+        expires_at: new Date(Date.now() + ttlHours * 3600 * 1000),
+        created_by: actor,
+      });
+      await logEvent({ actor, eventType: 'enrollment.token_created', details: { token_id: doc.token_id, label, max_uses: maxUses, ttl_hours: ttlHours } });
+      return { tokenId: doc.token_id, token, label, maxUses, expiresAt: dateToIso(doc.expires_at) };
+    },
+
+    async *listEnrollmentTokens(req) {
+      const now = new Date();
+      const docs = await EnrollmentToken.find().sort({ created_at: -1 }).limit(appConfig.limits.pageSizeMax).lean();
+      for (const t of docs) {
+        const active = isActive(t, now);
+        if (!active && !req.includeInactive) continue;
+        yield {
+          tokenId: t.token_id,
+          label: t.label,
+          maxUses: t.max_uses,
+          uses: t.uses,
+          expiresAt: dateToIso(t.expires_at),
+          revoked: Boolean(t.revoked_at),
+          active,
+          createdBy: t.created_by,
+          createdAt: dateToIso(t.created_at),
+          lastUsedAt: dateToIso(t.last_used_at),
+        };
+      }
+    },
+
+    async revokeEnrollmentToken(req, ctx) {
+      if (!req.tokenId) throw invalidArg('token_id is required');
+      const revoked = await EnrollmentToken.findOneAndUpdate(
+        { token_id: req.tokenId, revoked_at: null },
+        { $set: { revoked_at: new Date() } },
+        { returnDocument: 'after' }
+      );
+      if (revoked) {
+        await logEvent({ actor: authOf(ctx).sub, eventType: 'enrollment.token_revoked', details: { token_id: req.tokenId } });
+        return { revoked: true };
+      }
+      if (!(await EnrollmentToken.exists({ token_id: req.tokenId }))) throw notFound('Enrollment token not found');
+      return { revoked: true };
     },
 
     async getFlServerStatus() {

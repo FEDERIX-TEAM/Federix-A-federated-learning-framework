@@ -165,12 +165,21 @@ export async function startTestServer({ env = {} } = {}) {
     events: createClient(EventStreamService, transport),
   };
 
-  const login = await api.auth.adminLogin(admin);
-  const superAdmin = bearer(login.accessToken);
   const internal = { headers: { 'x-internal-service-token': internalToken } };
+  let superAdmin;
+  let enrollmentToken;
+  try {
+    superAdmin = bearer((await api.auth.adminLogin(admin)).accessToken);
+    const maxUses = Number(env.ENROLLMENT_TOKEN_MAX_USES ?? 1000);
+    const ttlHours = Math.min(24, Number(env.ENROLLMENT_TOKEN_MAX_TTL_HOURS ?? 24));
+    ({ token: enrollmentToken } = await api.admin.createEnrollmentToken({ label: 'test harness', maxUses, ttlHours }, superAdmin));
+  } catch (err) {
+    await cleanup();
+    throw new Error(`test server setup failed: ${err.message}\n${stderr.join('')}`);
+  }
 
   async function newSdkClient(name = 'test-client') {
-    const reg = await api.auth.register({ name, sdkVersion: '1.0.0', platform: 'test' });
+    const reg = await api.auth.register({ name, sdkVersion: '1.0.0', platform: 'test', enrollmentToken });
     const session = await api.auth.clientLogin({ clientId: reg.clientId, apiKey: reg.apiKey });
     return { id: reg.clientId, apiKey: reg.apiKey, ...bearer(session.accessToken) };
   }
@@ -221,5 +230,5 @@ export async function startTestServer({ env = {} } = {}) {
     return { ...done, newModelVersion, updates: ups, model };
   }
 
-  return { baseUrl, dbName, storageDir, api, superAdmin, adminCredentials: admin, internal, newSdkClient, submitUpdate, uploadModel, completeRound, nextModelVersion, stop: cleanup };
+  return { baseUrl, dbName, storageDir, api, superAdmin, adminCredentials: admin, enrollmentToken, internal, newSdkClient, submitUpdate, uploadModel, completeRound, nextModelVersion, stop: cleanup };
 }

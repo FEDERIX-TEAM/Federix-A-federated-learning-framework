@@ -7,6 +7,7 @@ const clientSchema = new mongoose.Schema(
     name: { type: String, required: true },
     description: { type: String, default: '' },
     sdk_version: { type: String, required: true },
+    enrollment_token_id: { type: String, default: null, index: true },
     platform: { type: String, required: true },
 
     status: {
