@@ -12,6 +12,7 @@ from federix.fedprox import local_train
 from federix.interfaces import ClientUpdate
 from federix.logger import get_logger
 from federix.model import make_model
+from federix.utility import label_counts, tier, utility
 
 
 def run(cfg, datasets=None, log=None):
@@ -28,6 +29,7 @@ def run(cfg, datasets=None, log=None):
     metrics = evaluate(model, w, test, cfg.eval_batch_size)
     log.info(f"round 0/{cfg.rounds} | initial model | acc={metrics['acc']:.4f} loss={metrics['loss']:.4f}")
     rounds_with_updates = 0
+    scores = []
 
     for t in range(cfg.rounds):
         chosen = random.sample(range(cfg.num_clients), cfg.clients_per_round)
@@ -39,10 +41,20 @@ def run(cfg, datasets=None, log=None):
             except Exception as e:
                 log.warning(f"  client={k} FAILED ({type(e).__name__}: {e}) - skipped")
                 continue
-            up = ClientUpdate(client_id=str(k), payload=("dense", delta), num_samples=len(clients[k].train),
-                              loss_before=lb, loss_after=la, bytes_sent=delta.numel() * 4)
+            n = len(clients[k].train)
+            u = utility(lb, la, n, label_counts(clients[k].train), cfg)
+            update_tier = tier(u.score if u else None, cfg)
+            up = ClientUpdate(client_id=str(k), payload=("dense", delta), num_samples=n,
+                              loss_before=lb, loss_after=la, utility=u.score if u else 0.0,
+                              ratio=update_tier.ratio, bytes_sent=delta.numel() * 4)
             updates.append(up)
-            log.info(f"  client={k} n={up.num_samples} val_loss {lb:.3f}->{la:.3f} bytes={up.bytes_sent:,}")
+            if u:
+                scores.append(u.score)
+                log.info(f"  client={k} n={n} val_loss {lb:.3f}->{la:.3f} "
+                         f"u={u.score:.3f} (q={u.quality:.3f} s={u.size:.3f} r={u.diversity:.3f}) "
+                         f"tier={update_tier.status}/{update_tier.level} ratio={update_tier.ratio} bytes={up.bytes_sent:,}")
+            else:
+                log.warning(f"  client={k} n={n} utility could not be computed from val_loss {lb}->{la}")
         if not updates:
             log.warning(f"round {t + 1}/{cfg.rounds} | no client updates - global model unchanged")
             continue
@@ -54,7 +66,8 @@ def run(cfg, datasets=None, log=None):
         log.info(f"round {t + 1}/{cfg.rounds} | updated {len(updates)}/{len(chosen)} | "
                  f"acc={metrics['acc']:.4f} loss={metrics['loss']:.4f} | cum_MB={total_bytes / 1e6:.2f}")
 
-    return {**metrics, "MB": total_bytes / 1e6, "rounds_with_updates": rounds_with_updates}
+    mean_utility = sum(scores) / len(scores) if scores else 0.0
+    return {**metrics, "MB": total_bytes / 1e6, "rounds_with_updates": rounds_with_updates, "mean_utility": mean_utility}
 
 
 def parse_args(argv):

@@ -36,6 +36,8 @@ Unknown setting names are refused. Defaults match the central server's `SystemCo
 | `dirichlet_alpha` / `min_client_samples` / `split_max_attempts` | 0.1 / 10 / 1000 | Non-IID label split; smaller alpha = more skew |
 | `val_fraction` | 0.2 | Share of each client's data held out; losses before and after training are measured on it |
 | `a` / `b` / `c` / `eps` | 1.0 / 0.5 / 0.3 / 1e-8 | Utility weights for quality, size, diversity |
+| `size_saturation` / `num_classes` | 500 / 10 | n₀ in the size score, and the class count diversity is normalised by |
+| `reject_below` | 0 | Updates with utility below this are rejected; 0 never rejects (the paper's behaviour) |
 | `tau_high` / `tau_low` / `ratios` | 0.8 / 0.2 / (1.0, 0.5, 0.1) | Compression tiers |
 | `temperature` | 1.0 | Utility-weighted aggregation |
 | `num_threads` / `eval_batch_size` / `seed` | 4 / 1024 / 0 | Runtime and reproducibility |
