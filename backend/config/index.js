@@ -145,6 +145,13 @@ export const config = {
     authRecheckMs: int('STREAM_AUTH_RECHECK_MS', 30000, { min: 100 }),
   },
 
+  scheduler: {
+    intervalMs: int('SCHEDULER_INTERVAL_MS', 1000, { min: 50 }),
+    aggregationTimeoutSeconds: int('AGGREGATION_TIMEOUT_SECONDS', 900, { min: 1 }),
+    watchKeepaliveMs: int('WATCH_KEEPALIVE_MS', 15000, { min: 100 }),
+    flStatusStaleAfterMs: int('FL_STATUS_STALE_AFTER_MS', 60000, { min: 100 }),
+  },
+
   clientStatus: {
     checkIntervalMs: int('CLIENT_STATUS_CHECK_INTERVAL_MS', 60000, { min: 100 }),
     idleAfterMs: int('CLIENT_IDLE_AFTER_MS', 300000, { min: 100 }),

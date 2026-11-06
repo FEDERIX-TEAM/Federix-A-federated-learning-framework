@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { config } from '../../config/index.js';
+import { latestFlStatus } from '../lib/flStatus.js';
 import { logEvent } from '../../utils/auditLog.js';
 import { authOf } from '../lib/helpers.js';
 import { invalidArg } from '../lib/errors.js';
@@ -12,6 +13,7 @@ export function createSystemService({ redis }) {
   return {
     async healthCheck() {
       const dbOk = mongoose.connection.readyState === 1;
+      const fl = dbOk ? await latestFlStatus().catch(() => null) : null;
       let redisState = 'connected';
       if (redis.status !== 'ready') {
         redisState = 'unavailable';
@@ -27,7 +29,7 @@ export function createSystemService({ redis }) {
         status: dbOk && redisState !== 'unavailable' ? 'ok' : 'degraded',
         db: dbOk ? 'connected' : 'disconnected',
         redis: redisState,
-        flServer: 'unknown', // the FL server is a client of this service; it is not probed from here
+        flServer: fl ? (fl.online ? 'online' : 'offline') : 'unknown',
         queueDepth: 0,
         uptimeMs: BigInt(Date.now() - START_TIME),
       };

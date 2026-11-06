@@ -90,7 +90,7 @@ test('HEARTBEAT_TIMEOUT_MS drops a silent participant and keeps an active one', 
 });
 
 test('SIGNED_URL_TTL_SECONDS controls how long a download URL works', async () => {
-  const version = 1 + Math.floor(Math.random() * 1e9);
+  const version = await srv.nextModelVersion();
   const { resourcePath } = await srv.uploadModel(version);
   await srv.api.fl.pushModel({ modelVersion: version, weightsUrl: resourcePath }, srv.internal);
   const c = await srv.newSdkClient('downloader');
@@ -148,7 +148,10 @@ test('MIN_PASSWORD_LENGTH is enforced when creating users', async () => {
 test('AGGREGATION_BASE_MS and AGGREGATION_PER_UPDATE_MS drive the TriggerRound estimate', async () => {
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
-    const res = await srv.api.fl.triggerRound({ roundId: round.roundId, updateIds: ['a', 'b', 'c'] }, srv.internal);
+    const c = await srv.newSdkClient('estimate');
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, c);
+    await srv.submitUpdate(c, { roundId: round.roundId, dataSize: 100 });
+    const res = await srv.api.fl.triggerRound({ roundId: round.roundId, updateIds: [] }, srv.internal);
     assert.equal(res.estimatedDurationMs, 1234);
   } finally {
     await srv.api.admin.stopRound({ roundId: round.roundId }, srv.superAdmin);

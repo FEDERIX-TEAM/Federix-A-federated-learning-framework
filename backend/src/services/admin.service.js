@@ -18,10 +18,12 @@ import {
   ROUND_STATUS_TO_PROTO,
   UPDATE_STATUS_TO_PROTO,
   COMPRESSION_LEVEL_TO_PROTO,
+  FL_SERVER_STATE_TO_PROTO,
   dateToIso,
 } from '../../utils/protoMappers.js';
 import { authOf, getActiveConfig, clampN, parseDate, num, joinedCount, giniCoefficient } from '../lib/helpers.js';
-import { invalidArg, notFound, failedPrecondition, notImplementedYet } from '../lib/errors.js';
+import { invalidArg, notFound, failedPrecondition } from '../lib/errors.js';
+import { latestFlStatus } from '../lib/flStatus.js';
 import { requireFinite } from '../lib/validate.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 
@@ -577,7 +579,18 @@ export function createAdminService({ redis }) {
     },
 
     async getFlServerStatus() {
-      throw notImplementedYet('AdminService.GetFlServerStatus');
+      const status = await latestFlStatus();
+      if (!status) return { online: false, state: 0, message: 'The FL server has not reported yet' };
+      return {
+        online: status.online,
+        state: FL_SERVER_STATE_TO_PROTO[status.state],
+        workerId: status.worker_id,
+        currentRoundId: status.current_round_id ?? '',
+        version: status.version,
+        message: status.message,
+        lastError: status.last_error,
+        lastReportAt: dateToIso(status.last_report_at),
+      };
     },
 
     async deleteUser(req, ctx) {

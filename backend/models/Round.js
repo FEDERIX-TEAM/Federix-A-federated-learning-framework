@@ -43,6 +43,13 @@ const roundSchema = new mongoose.Schema(
     global_accuracy: { type: Number, default: null },
 
     aborted_reason: { type: String, default: null },
+    failed_reason: { type: String, default: null },
+
+    ready_at: { type: Date, default: null },
+    ready_reason: { type: String, enum: ['deadline', 'all_submitted', 'max_updates', null], default: null },
+    ready_update_count: { type: Number, default: null },
+    aggregating_started_at: { type: Date, default: null },
+    aggregation_update_ids: { type: [String], default: undefined },
 
     started_at: { type: Date, default: Date.now },
     completed_at: { type: Date, default: null },

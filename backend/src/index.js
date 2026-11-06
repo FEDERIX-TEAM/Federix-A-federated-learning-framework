@@ -12,6 +12,7 @@ import { registerStorageRoute, startStorageSweeper, storage } from './storage.js
 import { recordStoredObject } from './lib/uploads.js';
 import { startHeartbeatWatcher } from './heartbeatWatcher.js';
 import { startClientStatusWatcher } from './clientStatusWatcher.js';
+import { createRoundScheduler } from './roundScheduler.js';
 import { getActiveConfig } from './lib/helpers.js';
 import { ensureRoundIndexes } from '../models/Round.js';
 
@@ -79,6 +80,8 @@ async function main() {
     }
   });
 
+  const scheduler = createRoundScheduler({ logger });
+
   await app.register(fastifyConnectPlugin, {
     interceptors: buildInterceptors({ redis, logger }),
     routes: (router) => {
@@ -86,7 +89,7 @@ async function main() {
       router.service(ClientService, createClientService());
       router.service(AdminService, createAdminService({ redis }));
       router.service(SystemService, createSystemService({ redis }));
-      router.service(FlBridgeService, createFlBridgeService());
+      router.service(FlBridgeService, createFlBridgeService({ scheduler }));
       router.service(EventStreamService, createEventService({ redis, logger }));
     },
   });
@@ -95,6 +98,7 @@ async function main() {
   const stopHeartbeatWatcher = startHeartbeatWatcher(logger);
   const stopClientStatusWatcher = startClientStatusWatcher(logger);
   const stopStorageSweeper = startStorageSweeper(logger);
+  scheduler.start();
 
   let closing = false;
   const shutdown = async (signal) => {
@@ -104,6 +108,7 @@ async function main() {
     stopHeartbeatWatcher();
     stopClientStatusWatcher();
     stopStorageSweeper();
+    scheduler.stop();
     // Long-lived Subscribe streams never end on their own; don't wait on them.
     setTimeout(() => process.exit(0), 5000).unref();
     try {

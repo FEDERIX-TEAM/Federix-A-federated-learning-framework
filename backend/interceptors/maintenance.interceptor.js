@@ -3,7 +3,7 @@ import { isMaintenanceGated } from './rbacRules.js';
 
 export function createMaintenanceInterceptor(redis) {
   return (next) => async (req) => {
-    if (isMaintenanceGated(req.service.typeName.split('.').pop())) {
+    if (isMaintenanceGated(req.service.typeName.split('.').pop(), req.method.name)) {
       const raw = await redis.get('system:maintenance');
       if (raw) {
         let details = {};
