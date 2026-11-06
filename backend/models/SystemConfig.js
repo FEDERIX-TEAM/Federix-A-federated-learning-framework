@@ -14,6 +14,17 @@ const systemConfigSchema = new mongoose.Schema(
     utility_threshold_low: { type: Number, default: 0.2 },
     compression_ratio: { type: Number, default: 0.5 },
 
+    weight_quality: { type: Number, default: 1.0 },
+    weight_size: { type: Number, default: 0.5 },
+    weight_diversity: { type: Number, default: 0.3 },
+    size_saturation: { type: Number, default: 500 },
+    num_classes: { type: Number, default: 10 },
+    temperature: { type: Number, default: 1.0 },
+    ratio_high: { type: Number, default: 1.0 },
+    ratio_medium: { type: Number, default: 0.5 },
+    ratio_low: { type: Number, default: 0.1 },
+    reject_below: { type: Number, default: 0 },
+
     updated_by: { type: String, default: null },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }

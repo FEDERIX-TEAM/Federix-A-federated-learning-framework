@@ -1,0 +1,555 @@
+{
+  "version": 1,
+  "epsilon": 1e-08,
+  "default_config": {
+    "weight_quality": 1.0,
+    "weight_size": 0.5,
+    "weight_diversity": 0.3,
+    "size_saturation": 500,
+    "num_classes": 10,
+    "temperature": 1.0,
+    "utility_threshold_high": 0.8,
+    "utility_threshold_low": 0.2,
+    "ratio_high": 1.0,
+    "ratio_medium": 0.5,
+    "ratio_low": 0.1,
+    "reject_below": 0
+  },
+  "cases": [
+    {
+      "name": "perfect update: big drop, lots of data, all 10 classes",
+      "config": {},
+      "input": {
+        "local_loss_before": 2.0,
+        "local_loss_after": 0.0,
+        "data_size": 100000,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100,
+          "3": 100,
+          "4": 100,
+          "5": 100,
+          "6": 100,
+          "7": 100,
+          "8": 100,
+          "9": 100
+        }
+      },
+      "expected": {
+        "quality": 0.999999995,
+        "size": 1.0,
+        "diversity": 1.0,
+        "score": 0.9999999972222222
+      },
+      "tier": {
+        "status": "accepted",
+        "level": "none",
+        "ratio": 1.0
+      }
+    },
+    {
+      "name": "no improvement, no data, no labels",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 1.0,
+        "data_size": 0,
+        "label_distribution": {}
+      },
+      "expected": {
+        "quality": 0.0,
+        "size": 0.0,
+        "diversity": 0.0,
+        "score": 0.0
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "full",
+        "ratio": 0.1
+      }
+    },
+    {
+      "name": "loss got worse is clipped to zero quality",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 1.5,
+        "data_size": 500,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100
+        }
+      },
+      "expected": {
+        "quality": 0.0,
+        "size": 0.6321205588285577,
+        "diversity": 0.47712125471966244,
+        "score": 0.25510925323898753
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "zero starting loss gives zero quality",
+      "config": {},
+      "input": {
+        "local_loss_before": 0.0,
+        "local_loss_after": 0.0,
+        "data_size": 500,
+        "label_distribution": {
+          "0": 100,
+          "1": 100
+        }
+      },
+      "expected": {
+        "quality": 0.0,
+        "size": 0.6321205588285577,
+        "diversity": 0.3010299956639812,
+        "score": 0.22576071006304066
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "two classes split evenly is NOT full diversity out of 10",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.5,
+        "data_size": 1000,
+        "label_distribution": {
+          "0": 500,
+          "1": 500
+        }
+      },
+      "expected": {
+        "quality": 0.4999999950000001,
+        "size": 0.8646647167633873,
+        "diversity": 0.3010299956639812,
+        "score": 0.5681340844893823
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "ten classes split evenly is full diversity",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.5,
+        "data_size": 1000,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100,
+          "3": 100,
+          "4": 100,
+          "5": 100,
+          "6": 100,
+          "7": 100,
+          "8": 100,
+          "9": 100
+        }
+      },
+      "expected": {
+        "quality": 0.4999999950000001,
+        "size": 0.8646647167633873,
+        "diversity": 1.0,
+        "score": 0.684629085212052
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "skewed labels",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.6,
+        "data_size": 800,
+        "label_distribution": {
+          "0": 700,
+          "1": 80,
+          "2": 20
+        }
+      },
+      "expected": {
+        "quality": 0.3999999960000001,
+        "size": 0.7981034820053446,
+        "diversity": 0.190794453388675,
+        "score": 0.47571670723293047
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "more classes than num_classes is capped at 1",
+      "config": {
+        "num_classes": 4
+      },
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.5,
+        "data_size": 1000,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100,
+          "3": 100,
+          "4": 100,
+          "5": 100,
+          "6": 100,
+          "7": 100
+        }
+      },
+      "expected": {
+        "quality": 0.4999999950000001,
+        "size": 0.8646647167633873,
+        "diversity": 1.0,
+        "score": 0.684629085212052
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "size at the saturation point",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 1.0,
+        "data_size": 500,
+        "label_distribution": {}
+      },
+      "expected": {
+        "quality": 0.0,
+        "size": 0.6321205588285577,
+        "diversity": 0.0,
+        "score": 0.1755890441190438
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "full",
+        "ratio": 0.1
+      }
+    },
+    {
+      "name": "smaller saturation makes size count sooner",
+      "config": {
+        "size_saturation": 50
+      },
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 1.0,
+        "data_size": 100,
+        "label_distribution": {}
+      },
+      "expected": {
+        "quality": 0.0,
+        "size": 0.8646647167633873,
+        "diversity": 0.0,
+        "score": 0.24018464354538535
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "quality-only weights",
+      "config": {
+        "weight_size": 0,
+        "weight_diversity": 0
+      },
+      "input": {
+        "local_loss_before": 4.0,
+        "local_loss_after": 1.0,
+        "data_size": 10,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100,
+          "3": 100,
+          "4": 100,
+          "5": 100,
+          "6": 100,
+          "7": 100,
+          "8": 100,
+          "9": 100
+        }
+      },
+      "expected": {
+        "quality": 0.7499999981250001,
+        "size": 0.019801326693244747,
+        "diversity": 1.0,
+        "score": 0.7499999981250001
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "diversity-only weights",
+      "config": {
+        "weight_quality": 0,
+        "weight_size": 0
+      },
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.0,
+        "data_size": 10,
+        "label_distribution": {
+          "0": 1,
+          "1": 1,
+          "2": 1,
+          "3": 1
+        }
+      },
+      "expected": {
+        "quality": 0.9999999900000002,
+        "size": 0.019801326693244747,
+        "diversity": 0.6020599913279624,
+        "score": 0.6020599913279624
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "mediocre update lands in the medium tier",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.3,
+        "data_size": 300,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100,
+          "3": 100,
+          "4": 100
+        }
+      },
+      "expected": {
+        "quality": 0.699999993,
+        "size": 0.4511883639059736,
+        "diversity": 0.6989700043360187,
+        "score": 0.6307139868076624
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.5
+      }
+    },
+    {
+      "name": "poor update is compressed hard, not rejected, by default",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.98,
+        "data_size": 20,
+        "label_distribution": {
+          "0": 20
+        }
+      },
+      "expected": {
+        "quality": 0.019999999800000022,
+        "size": 0.03921056084767682,
+        "diversity": 0.0,
+        "score": 0.022002933457688018
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "full",
+        "ratio": 0.1
+      }
+    },
+    {
+      "name": "poor update is rejected when reject_below is set",
+      "config": {
+        "reject_below": 0.1
+      },
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.98,
+        "data_size": 20,
+        "label_distribution": {
+          "0": 20
+        }
+      },
+      "expected": {
+        "quality": 0.019999999800000022,
+        "size": 0.03921056084767682,
+        "diversity": 0.0,
+        "score": 0.022002933457688018
+      },
+      "tier": {
+        "status": "rejected",
+        "level": null,
+        "ratio": 0
+      }
+    },
+    {
+      "name": "high tier with ratio_high below 1 is compressed",
+      "config": {
+        "ratio_high": 0.8,
+        "utility_threshold_high": 0.5
+      },
+      "input": {
+        "local_loss_before": 2.0,
+        "local_loss_after": 0.0,
+        "data_size": 100000,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100,
+          "3": 100,
+          "4": 100,
+          "5": 100,
+          "6": 100,
+          "7": 100,
+          "8": 100,
+          "9": 100
+        }
+      },
+      "expected": {
+        "quality": 0.999999995,
+        "size": 1.0,
+        "diversity": 1.0,
+        "score": 0.9999999972222222
+      },
+      "tier": {
+        "status": "compressed",
+        "level": "partial",
+        "ratio": 0.8
+      }
+    },
+    {
+      "name": "exactly on the high threshold counts as high",
+      "config": {
+        "utility_threshold_high": 0.684629085212052
+      },
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.5,
+        "data_size": 1000,
+        "label_distribution": {
+          "0": 100,
+          "1": 100,
+          "2": 100,
+          "3": 100,
+          "4": 100,
+          "5": 100,
+          "6": 100,
+          "7": 100,
+          "8": 100,
+          "9": 100
+        }
+      },
+      "expected": {
+        "quality": 0.4999999950000001,
+        "size": 0.8646647167633873,
+        "diversity": 1.0,
+        "score": 0.684629085212052
+      },
+      "tier": {
+        "status": "accepted",
+        "level": "none",
+        "ratio": 1.0
+      }
+    },
+    {
+      "name": "non-finite loss is invalid",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": "NaN",
+        "data_size": 100,
+        "label_distribution": {}
+      },
+      "expected": null,
+      "tier": {
+        "status": "rejected",
+        "level": null,
+        "ratio": 0
+      }
+    },
+    {
+      "name": "negative loss is invalid",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": -0.1,
+        "data_size": 100,
+        "label_distribution": {}
+      },
+      "expected": null,
+      "tier": {
+        "status": "rejected",
+        "level": null,
+        "ratio": 0
+      }
+    },
+    {
+      "name": "negative label count is invalid",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.5,
+        "data_size": 100,
+        "label_distribution": {
+          "0": -1
+        }
+      },
+      "expected": null,
+      "tier": {
+        "status": "rejected",
+        "level": null,
+        "ratio": 0
+      }
+    },
+    {
+      "name": "dotted label key is invalid",
+      "config": {},
+      "input": {
+        "local_loss_before": 1.0,
+        "local_loss_after": 0.5,
+        "data_size": 100,
+        "label_distribution": {
+          "a.b": 1
+        }
+      },
+      "expected": null,
+      "tier": {
+        "status": "rejected",
+        "level": null,
+        "ratio": 0
+      }
+    }
+  ]
+}

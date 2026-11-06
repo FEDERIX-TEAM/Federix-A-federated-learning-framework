@@ -115,7 +115,7 @@ async function main() {
   await expectCode('UpdateConfig invalid -> InvalidArgument', Code.InvalidArgument, () => admin.updateConfig({ utilityThresholdLow: 0.9, utilityThresholdHigh: 0.1 }, SA));
   await expectCode('UpdateConfig NaN mu -> InvalidArgument', Code.InvalidArgument, () => admin.updateConfig({ mu: NaN }, SA));
   await expectCode('UpdateConfig Infinity threshold -> InvalidArgument', Code.InvalidArgument, () => admin.updateConfig({ utilityThresholdHigh: Infinity }, SA));
-  const upd = await admin.updateConfig({ minClientsPerRound: 2, utilityThresholdLow: 0.05, utilityThresholdHigh: 0.5, mu: 0.02 }, SA);
+  const upd = await admin.updateConfig({ minClientsPerRound: 2, utilityThresholdLow: 0.05, utilityThresholdHigh: 0.5, mu: 0.02, utility: { rejectBelow: 0.05 } }, SA);
   check('UpdateConfig', upd.updatedConfig.minClientsPerRound === 2 && upd.updatedConfig.mu === 0.02);
   check('GetConfigHistory', (await collect(admin.getConfigHistory({}, adminUser))).length >= 1);
   const ccfg = await client.getConfig({}, clients[0]);
@@ -202,7 +202,7 @@ async function main() {
   check('GetOverview', ov.currentRoundId === start.roundId && ov.totalClients >= 3);
   check('ListClients', (await collect(admin.listClients({ limit: 100 }, adminUser))).some((c) => c.clientId === clients[0].id));
   const cd = await admin.getClientDetail({ clientId: clients[0].id }, engineer);
-  check('GetClientDetail', cd.history.length === 1 && cd.labelEntropyAvg > 0.9);
+  check('GetClientDetail (3 balanced classes out of 10)', cd.history.length === 1 && Math.abs(cd.labelEntropyAvg - Number((Math.log2(3) / Math.log2(10)).toFixed(4))) < 1e-9, String(cd.labelEntropyAvg));
 
   section('FL bridge (internal token)');
   await expectCode('Bad internal token -> Unauthenticated', Code.Unauthenticated, () => fl.getFlConfig({}, { headers: { 'x-internal-service-token': 'wrong' } }));

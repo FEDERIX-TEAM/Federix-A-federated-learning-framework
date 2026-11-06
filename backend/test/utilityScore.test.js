@@ -1,87 +1,90 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeUtilityScore, labelEntropy } from '../utils/utilityScore.js';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import {
+  computeUtilityScore,
+  utilityComponents,
+  utilityTier,
+  labelEntropy,
+  utilityConfigToProto,
+  EPSILON,
+} from '../utils/utilityScore.js';
 
-const uniform = (classes, n = 100) => Object.fromEntries([...Array(classes).keys()].map((c) => [String(c), n]));
+const vectorsPath = fileURLToPath(new URL('../../spec/utility_vectors.json', import.meta.url));
+const vectors = JSON.parse(fs.readFileSync(vectorsPath, 'utf8'));
+const TOLERANCE = 1e-12;
 
-test('labelEntropy is 0 for empty or single-class distributions', () => {
-  assert.equal(labelEntropy({}), 0);
-  assert.equal(labelEntropy(), 0);
-  assert.equal(labelEntropy({ 0: 50 }), 0);
+const toInput = (raw) => ({
+  localLossBefore: raw.local_loss_before === 'NaN' ? NaN : raw.local_loss_before,
+  localLossAfter: raw.local_loss_after === 'NaN' ? NaN : raw.local_loss_after,
+  dataSize: raw.data_size,
+  labelDistribution: raw.label_distribution,
 });
 
-test('labelEntropy is 1 for a uniform distribution', () => {
-  assert.equal(labelEntropy({ 0: 10, 1: 10 }), 1);
-  assert.ok(Math.abs(labelEntropy(uniform(10)) - 1) < 1e-12);
+test('the shared vectors use the same epsilon as the backend', () => {
+  assert.equal(vectors.epsilon, EPSILON);
+  assert.ok(vectors.cases.length >= 20);
 });
 
-test('labelEntropy of a skewed distribution is between 0 and 1', () => {
-  const h = labelEntropy({ 0: 3, 1: 1 });
-  assert.ok(Math.abs(h - 0.8112781244591328) < 1e-12);
+for (const c of vectors.cases) {
+  test(`shared vector: ${c.name}`, () => {
+    const cfg = { ...vectors.default_config, ...c.config };
+    const got = utilityComponents(toInput(c.input), cfg);
+    if (c.expected === null) {
+      assert.equal(got, null);
+    } else {
+      for (const key of ['quality', 'size', 'diversity', 'score']) {
+        assert.ok(Math.abs(got[key] - c.expected[key]) < TOLERANCE, `${key}: got ${got[key]}, expected ${c.expected[key]}`);
+      }
+    }
+    const tier = utilityTier(got?.score ?? null, cfg);
+    assert.equal(tier.status, c.tier.status);
+    assert.equal(tier.level, c.tier.level);
+    assert.equal(tier.ratio, c.tier.ratio);
+  });
+}
+
+test('diversity is normalised by num_classes, not by the classes a client happens to have', () => {
+  assert.ok(Math.abs(labelEntropy({ 0: 50, 1: 50 }, 10) - 1 / Math.log2(10)) < TOLERANCE);
+  assert.equal(labelEntropy(Object.fromEntries([...Array(10).keys()].map((i) => [i, 7])), 10), 1);
+  assert.equal(labelEntropy({ 0: 50, 1: 50 }, 2), 1);
 });
 
-test('labelEntropy ignores zero, negative and non-numeric counts', () => {
-  assert.equal(labelEntropy({ 0: 10, 1: 0, 2: -4, 3: 'x' }), 0);
-  assert.equal(labelEntropy({ 0: 10, 1: 10, 2: 0 }), 1);
+test('labelEntropy is 0 for empty or single-class distributions and ignores bad counts', () => {
+  assert.equal(labelEntropy({}, 10), 0);
+  assert.equal(labelEntropy({ 0: 50 }, 10), 0);
+  assert.equal(labelEntropy({ 0: 10, 1: 0, 2: -4, 3: 'x', 4: Infinity }, 10), 0);
 });
 
-test('computeUtilityScore is 0 with no improvement, no data and no labels', () => {
-  assert.equal(computeUtilityScore({ localLossBefore: 1, localLossAfter: 1, dataSize: 0, labelDistribution: {} }), 0);
+test('weights that sum to zero or a non-positive saturation make the score uncomputable', () => {
+  const input = { localLossBefore: 1, localLossAfter: 0.5, dataSize: 100, labelDistribution: {} };
+  const base = vectors.default_config;
+  assert.equal(computeUtilityScore(input, { ...base, weight_quality: 0, weight_size: 0, weight_diversity: 0 }), null);
+  assert.equal(computeUtilityScore(input, { ...base, size_saturation: 0 }), null);
+  assert.equal(utilityTier(null, base).status, 'rejected');
 });
 
-test('computeUtilityScore clips a worse loss to zero improvement', () => {
-  const worse = computeUtilityScore({ localLossBefore: 1, localLossAfter: 2, dataSize: 0, labelDistribution: {} });
-  assert.equal(worse, 0);
+test('reject_below of 0 never rejects a valid score', () => {
+  const cfg = { ...vectors.default_config, reject_below: 0 };
+  assert.equal(utilityTier(0, cfg).status, 'compressed');
+  assert.equal(utilityTier(0, cfg).level, 'full');
 });
 
-test('computeUtilityScore treats a zero starting loss as no improvement', () => {
-  assert.equal(computeUtilityScore({ localLossBefore: 0, localLossAfter: 0, dataSize: 0, labelDistribution: {} }), 0);
-});
-
-test('computeUtilityScore weights loss 0.5, size 0.3 and entropy 0.2', () => {
-  assert.equal(computeUtilityScore({ localLossBefore: 2, localLossAfter: 1, dataSize: 0, labelDistribution: {} }), 0.25);
-  assert.equal(computeUtilityScore({ localLossBefore: 1, localLossAfter: 1, dataSize: 500, labelDistribution: {} }), 0.1896);
-  assert.equal(computeUtilityScore({ localLossBefore: 1, localLossAfter: 1, dataSize: 0, labelDistribution: uniform(4) }), 0.2);
-});
-
-test('computeUtilityScore approaches 1 for a perfect update', () => {
-  const score = computeUtilityScore({ localLossBefore: 1, localLossAfter: 0, dataSize: 1e6, labelDistribution: uniform(10) });
-  assert.equal(score, 1);
-});
-
-test('labelEntropy ignores infinite counts', () => {
-  assert.equal(labelEntropy({ 0: Infinity, 1: 10 }), 0);
-  assert.equal(labelEntropy({ 0: Infinity, 1: 10, 2: 10 }), 1);
-});
-
-test('computeUtilityScore returns null instead of NaN for non-finite losses', () => {
-  const base = { localLossBefore: 2, localLossAfter: 1, dataSize: 100, labelDistribution: { 0: 5 } };
-  for (const bad of [NaN, Infinity, -Infinity]) {
-    assert.equal(computeUtilityScore({ ...base, localLossAfter: bad }), null);
-    assert.equal(computeUtilityScore({ ...base, localLossBefore: bad }), null);
-  }
-});
-
-test('computeUtilityScore returns null for negative losses, bad sizes or bad label counts', () => {
-  const base = { localLossBefore: 2, localLossAfter: 1, dataSize: 100, labelDistribution: { 0: 5 } };
-  assert.equal(computeUtilityScore({ ...base, localLossAfter: -1 }), null);
-  assert.equal(computeUtilityScore({ ...base, dataSize: -5 }), null);
-  assert.equal(computeUtilityScore({ ...base, dataSize: NaN }), null);
-  assert.equal(computeUtilityScore({ ...base, labelDistribution: { 0: Infinity, 1: 3 } }), null);
-  assert.equal(computeUtilityScore({ ...base, labelDistribution: { 0: NaN } }), null);
-  assert.equal(computeUtilityScore({ ...base, labelDistribution: { 'a.b': 1 } }), null);
-});
-
-test('a null score can never pass a threshold check', () => {
-  const score = computeUtilityScore({ localLossBefore: 2, localLossAfter: NaN, dataSize: 100, labelDistribution: {} });
-  assert.equal(score, null);
-  assert.notEqual(typeof score, 'number');
-});
-
-test('computeUtilityScore stays within [0, 1] and is rounded to 4 decimals', () => {
-  for (const [before, after, n] of [[1, 0.3, 37], [5, 4.2, 1200], [0.7, 0.69, 3]]) {
-    const s = computeUtilityScore({ localLossBefore: before, localLossAfter: after, dataSize: n, labelDistribution: { 0: 2, 1: 5 } });
-    assert.ok(s >= 0 && s <= 1);
-    assert.equal(s, Number(s.toFixed(4)));
-  }
+test('utilityConfigToProto exposes every utility setting', () => {
+  const proto = utilityConfigToProto(vectors.default_config);
+  assert.deepEqual(proto, {
+    weightQuality: 1.0,
+    weightSize: 0.5,
+    weightDiversity: 0.3,
+    sizeSaturation: 500,
+    numClasses: 10,
+    temperature: 1.0,
+    thresholdHigh: 0.8,
+    thresholdLow: 0.2,
+    ratioHigh: 1.0,
+    ratioMedium: 0.5,
+    ratioLow: 0.1,
+    rejectBelow: 0,
+  });
 });

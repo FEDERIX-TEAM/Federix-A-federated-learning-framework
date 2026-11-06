@@ -165,6 +165,11 @@ export declare type UtilityConfig = Message<"federix.v1.UtilityConfig"> & {
    * @generated from field: double ratio_low = 11;
    */
   ratioLow: number;
+
+  /**
+   * @generated from field: double reject_below = 12;
+   */
+  rejectBelow: number;
 };
 
 /**
@@ -221,6 +226,11 @@ export declare type UtilityConfigUpdate = Message<"federix.v1.UtilityConfigUpdat
    * @generated from field: optional double ratio_low = 9;
    */
   ratioLow?: number | undefined;
+
+  /**
+   * @generated from field: optional double reject_below = 10;
+   */
+  rejectBelow?: number | undefined;
 };
 
 /**

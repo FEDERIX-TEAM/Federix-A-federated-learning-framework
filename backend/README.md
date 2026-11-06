@@ -296,7 +296,13 @@ that maps them to proto enum numbers. Handlers receive/return plain objects with
 ## Known stand-ins / what's left for the rest of the project
 
 - **Object storage is local.** Files live in `STORAGE_DIR` behind signed URLs with resumable uploads and range downloads (see Storage). RPCs that hand out upload URLs arrive with protocol v1.1; for production, swap `utils/signedUrl.js` and `src/storage.js` for S3/GCS presigned URLs.
-- **Utility score** (`utils/utilityScore.js`) is a simple formula (loss improvement 0.5 + data size 0.3 + label entropy 0.2) — replace with your research metric if needed.
+- **Utility score** (`utils/utilityScore.js`) follows the paper: `u = (a·q + b·s + c·r)/(a+b+c)` with
+  `q = clip((L_before − L_after)/(L_before + ε), 0, 1)`, `s = 1 − exp(−n/n₀)` and `r = H(labels)/log₂(num_classes)`.
+  Every parameter (weights, `n₀`, `num_classes`, thresholds, tier ratios, `reject_below`, temperature) lives in
+  `SystemConfig`, is changed with `UpdateConfig`, and is frozen per round. Tiers: `u ≥ threshold_high` uses
+  `ratio_high`, `u ≥ threshold_low` uses `ratio_medium`, otherwise `ratio_low`; updates are rejected on utility
+  only when `reject_below > 0`. The losses are still reported by the client; server-side checks come with the
+  FL server.
 - **Communication metrics** approximate bytes from `data_size` (no real transport accounting).
 - **No round-deadline enforcement:** `deadline_at` is stored and returned, and `JoinRound` refuses after it, but nothing auto-aborts/aggregates a round when it passes. Something (the FL server or a timer here) must call `TriggerRound`/`StopRound`.
 - **Events are in-process.** Fine for one instance; for horizontal scaling back `src/lib/events.js` with Redis pub/sub.

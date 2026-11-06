@@ -12,7 +12,7 @@ let srv;
 
 before(async () => {
   srv = await startTestServer();
-  await srv.api.admin.updateConfig({ minClientsPerRound: 1, utilityThresholdLow: 0.05, utilityThresholdHigh: 0.5 }, srv.superAdmin);
+  await srv.api.admin.updateConfig({ minClientsPerRound: 1, utilityThresholdLow: 0.05, utilityThresholdHigh: 0.5, utility: { rejectBelow: 0.05 } }, srv.superAdmin);
 });
 
 after(async () => {
