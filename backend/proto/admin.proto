@@ -42,6 +42,9 @@ service AdminService {
   rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse);
   rpc DeleteUser(UserIdRequest) returns (DeleteUserResponse);
   rpc GetFlServerStatus(Empty) returns (FlServerStatusResponse);
+  rpc CreateEnrollmentToken(CreateEnrollmentTokenRequest) returns (CreateEnrollmentTokenResponse);
+  rpc ListEnrollmentTokens(ListEnrollmentTokensRequest) returns (stream EnrollmentTokenEntry);
+  rpc RevokeEnrollmentToken(EnrollmentTokenIdRequest) returns (RevokeEnrollmentTokenResponse);
 }
 
 // ---- Clients ----
@@ -353,4 +356,43 @@ message FlServerStatusResponse {
   string message = 6;
   string last_error = 7;
   string last_report_at = 8;
+}
+
+message CreateEnrollmentTokenRequest {
+  string label = 1;
+  int32 max_uses = 2;
+  int32 ttl_hours = 3;
+}
+
+message CreateEnrollmentTokenResponse {
+  string token_id = 1;
+  string token = 2;
+  string label = 3;
+  int32 max_uses = 4;
+  string expires_at = 5;
+}
+
+message ListEnrollmentTokensRequest {
+  bool include_inactive = 1;
+}
+
+message EnrollmentTokenEntry {
+  string token_id = 1;
+  string label = 2;
+  int32 max_uses = 3;
+  int32 uses = 4;
+  string expires_at = 5;
+  bool revoked = 6;
+  bool active = 7;
+  string created_by = 8;
+  string created_at = 9;
+  string last_used_at = 10;
+}
+
+message EnrollmentTokenIdRequest {
+  string token_id = 1;
+}
+
+message RevokeEnrollmentTokenResponse {
+  bool revoked = 1;
 }

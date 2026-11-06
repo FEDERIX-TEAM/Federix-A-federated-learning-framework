@@ -99,13 +99,23 @@ async function main() {
   await expectCode('Demoted user loses admin RPCs after refresh', Code.PermissionDenied, () => collect(admin.listClients({}, bearer(demotedRefresh.accessToken))));
 
   section('Auth: clients');
+  await expectCode('Register without enrollment token -> Unauthenticated', Code.Unauthenticated, () => auth.register({ name: 'x', sdkVersion: '1.0.0', platform: 'linux' }));
+  await expectCode('CreateEnrollmentToken as viewer -> PermissionDenied', Code.PermissionDenied, () => admin.createEnrollmentToken({ maxUses: 1 }, viewer));
+  const enrollment = await admin.createEnrollmentToken({ label: `smoke-${sfx}`, maxUses: 3, ttlHours: 1 }, adminUser);
+  check('CreateEnrollmentToken', enrollment.token.startsWith('fdx_enroll_') && enrollment.maxUses === 3);
+  await expectCode('Register with unsupported sdk_version -> FailedPrecondition', Code.FailedPrecondition, () => auth.register({ name: 'x', sdkVersion: '0.0.1', platform: 'linux', enrollmentToken: enrollment.token }));
   const clients = [];
   for (let i = 0; i < 3; i += 1) {
-    const reg = await auth.register({ name: `smoke-${sfx}-${i}`, description: 'smoke', sdkVersion: '1.0.0', platform: 'linux' });
+    const reg = await auth.register({ name: `smoke-${sfx}-${i}`, description: 'smoke', sdkVersion: '1.0.0', platform: 'linux', enrollmentToken: enrollment.token });
     const tok = await auth.clientLogin({ clientId: reg.clientId, apiKey: reg.apiKey });
     clients.push({ id: reg.clientId, apiKey: reg.apiKey, ...bearer(tok.accessToken), token: tok.accessToken, refresh: tok.refreshToken });
   }
   check('Register + ClientLogin x3', clients.every((c) => c.id && c.token));
+  await expectCode('Register with a used-up token -> PermissionDenied', Code.PermissionDenied, () => auth.register({ name: 'x', sdkVersion: '1.0.0', platform: 'linux', enrollmentToken: enrollment.token }));
+  const tokens = await collect(admin.listEnrollmentTokens({ includeInactive: true }, SA));
+  const listed = tokens.find((t) => t.tokenId === enrollment.tokenId);
+  check('ListEnrollmentTokens shows uses and no secret', listed?.uses === 3 && !listed.active && !JSON.stringify(listed, (k, v) => (typeof v === 'bigint' ? v.toString() : v)).includes(enrollment.token));
+  check('RevokeEnrollmentToken', (await admin.revokeEnrollmentToken({ tokenId: enrollment.tokenId }, adminUser)).revoked);
   await expectCode('ClientLogin bad key -> Unauthenticated', Code.Unauthenticated, () => auth.clientLogin({ clientId: clients[0].id, apiKey: 'fdx_bad' }));
   await expectCode('Client token on admin RPC -> PermissionDenied', Code.PermissionDenied, () => collect(admin.listUsers({}, clients[0])));
   await expectCode('No token -> Unauthenticated', Code.Unauthenticated, () => client.getStatus({}));

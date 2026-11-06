@@ -29,7 +29,7 @@ async function newAdmin(role = Role.ADMIN) {
 }
 
 async function newClientSession() {
-  const reg = await srv.api.auth.register({ name: 'session-test', sdkVersion: '1.0.0', platform: 'test' });
+  const reg = await srv.api.auth.register({ name: 'session-test', sdkVersion: '1.0.0', platform: 'test', enrollmentToken: srv.enrollmentToken });
   const login = await srv.api.auth.clientLogin({ clientId: reg.clientId, apiKey: reg.apiKey });
   return { id: reg.clientId, apiKey: reg.apiKey, access: login.accessToken, refresh: login.refreshToken };
 }

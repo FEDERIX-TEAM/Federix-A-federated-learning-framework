@@ -20,6 +20,7 @@ message RegisterRequest {
   string description = 2;
   string sdk_version = 3;
   string platform = 4;
+  string enrollment_token = 5;
 }
 
 message RegisterResponse {

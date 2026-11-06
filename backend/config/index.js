@@ -123,6 +123,13 @@ export const config = {
     perIp: int('RATE_LIMIT_PER_IP', 300, { min: 1 }),
   },
 
+  enrollment: {
+    required: bool('ENROLLMENT_REQUIRED', true),
+    defaultTtlHours: int('ENROLLMENT_TOKEN_DEFAULT_TTL_HOURS', 168, { min: 1 }),
+    maxTtlHours: int('ENROLLMENT_TOKEN_MAX_TTL_HOURS', 720, { min: 1 }),
+    maxUses: int('ENROLLMENT_TOKEN_MAX_USES', 1000, { min: 1 }),
+  },
+
   loginLockout: {
     maxAttempts: int('LOGIN_MAX_ATTEMPTS', 5, { min: 1 }),
     lockoutSeconds: int('LOGIN_LOCKOUT_SECONDS', 900, { min: 1 }),
@@ -225,6 +232,7 @@ config.maxUpdateSizeMb = config.limits.maxUpdateSizeMb;
 config.storage.publicBaseUrl = url('PUBLIC_BASE_URL', `http://127.0.0.1:${config.port}`);
 
 notAbove('CLIENT_IDLE_AFTER_MS', config.clientStatus.idleAfterMs, 'CLIENT_DISCONNECTED_AFTER_MS', config.clientStatus.disconnectedAfterMs);
+notAbove('ENROLLMENT_TOKEN_DEFAULT_TTL_HOURS', config.enrollment.defaultTtlHours, 'ENROLLMENT_TOKEN_MAX_TTL_HOURS', config.enrollment.maxTtlHours);
 notAbove('PAGE_SIZE_DEFAULT', config.limits.pageSizeDefault, 'PAGE_SIZE_MAX', config.limits.pageSizeMax);
 notAbove('METRICS_ROUNDS_DEFAULT', config.limits.metricsRoundsDefault, 'METRICS_ROUNDS_MAX', config.limits.metricsRoundsMax);
 notAbove('LOGS_LIMIT_DEFAULT', config.limits.logsLimitDefault, 'LOGS_LIMIT_MAX', config.limits.logsLimitMax);

@@ -1333,6 +1333,177 @@ export declare type FlServerStatusResponse = Message<"federix.v1.FlServerStatusR
 export declare const FlServerStatusResponseSchema: GenMessage<FlServerStatusResponse>;
 
 /**
+ * @generated from message federix.v1.CreateEnrollmentTokenRequest
+ */
+export declare type CreateEnrollmentTokenRequest = Message<"federix.v1.CreateEnrollmentTokenRequest"> & {
+  /**
+   * @generated from field: string label = 1;
+   */
+  label: string;
+
+  /**
+   * @generated from field: int32 max_uses = 2;
+   */
+  maxUses: number;
+
+  /**
+   * @generated from field: int32 ttl_hours = 3;
+   */
+  ttlHours: number;
+};
+
+/**
+ * Describes the message federix.v1.CreateEnrollmentTokenRequest.
+ * Use `create(CreateEnrollmentTokenRequestSchema)` to create a new message.
+ */
+export declare const CreateEnrollmentTokenRequestSchema: GenMessage<CreateEnrollmentTokenRequest>;
+
+/**
+ * @generated from message federix.v1.CreateEnrollmentTokenResponse
+ */
+export declare type CreateEnrollmentTokenResponse = Message<"federix.v1.CreateEnrollmentTokenResponse"> & {
+  /**
+   * @generated from field: string token_id = 1;
+   */
+  tokenId: string;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+
+  /**
+   * @generated from field: string label = 3;
+   */
+  label: string;
+
+  /**
+   * @generated from field: int32 max_uses = 4;
+   */
+  maxUses: number;
+
+  /**
+   * @generated from field: string expires_at = 5;
+   */
+  expiresAt: string;
+};
+
+/**
+ * Describes the message federix.v1.CreateEnrollmentTokenResponse.
+ * Use `create(CreateEnrollmentTokenResponseSchema)` to create a new message.
+ */
+export declare const CreateEnrollmentTokenResponseSchema: GenMessage<CreateEnrollmentTokenResponse>;
+
+/**
+ * @generated from message federix.v1.ListEnrollmentTokensRequest
+ */
+export declare type ListEnrollmentTokensRequest = Message<"federix.v1.ListEnrollmentTokensRequest"> & {
+  /**
+   * @generated from field: bool include_inactive = 1;
+   */
+  includeInactive: boolean;
+};
+
+/**
+ * Describes the message federix.v1.ListEnrollmentTokensRequest.
+ * Use `create(ListEnrollmentTokensRequestSchema)` to create a new message.
+ */
+export declare const ListEnrollmentTokensRequestSchema: GenMessage<ListEnrollmentTokensRequest>;
+
+/**
+ * @generated from message federix.v1.EnrollmentTokenEntry
+ */
+export declare type EnrollmentTokenEntry = Message<"federix.v1.EnrollmentTokenEntry"> & {
+  /**
+   * @generated from field: string token_id = 1;
+   */
+  tokenId: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * @generated from field: int32 max_uses = 3;
+   */
+  maxUses: number;
+
+  /**
+   * @generated from field: int32 uses = 4;
+   */
+  uses: number;
+
+  /**
+   * @generated from field: string expires_at = 5;
+   */
+  expiresAt: string;
+
+  /**
+   * @generated from field: bool revoked = 6;
+   */
+  revoked: boolean;
+
+  /**
+   * @generated from field: bool active = 7;
+   */
+  active: boolean;
+
+  /**
+   * @generated from field: string created_by = 8;
+   */
+  createdBy: string;
+
+  /**
+   * @generated from field: string created_at = 9;
+   */
+  createdAt: string;
+
+  /**
+   * @generated from field: string last_used_at = 10;
+   */
+  lastUsedAt: string;
+};
+
+/**
+ * Describes the message federix.v1.EnrollmentTokenEntry.
+ * Use `create(EnrollmentTokenEntrySchema)` to create a new message.
+ */
+export declare const EnrollmentTokenEntrySchema: GenMessage<EnrollmentTokenEntry>;
+
+/**
+ * @generated from message federix.v1.EnrollmentTokenIdRequest
+ */
+export declare type EnrollmentTokenIdRequest = Message<"federix.v1.EnrollmentTokenIdRequest"> & {
+  /**
+   * @generated from field: string token_id = 1;
+   */
+  tokenId: string;
+};
+
+/**
+ * Describes the message federix.v1.EnrollmentTokenIdRequest.
+ * Use `create(EnrollmentTokenIdRequestSchema)` to create a new message.
+ */
+export declare const EnrollmentTokenIdRequestSchema: GenMessage<EnrollmentTokenIdRequest>;
+
+/**
+ * @generated from message federix.v1.RevokeEnrollmentTokenResponse
+ */
+export declare type RevokeEnrollmentTokenResponse = Message<"federix.v1.RevokeEnrollmentTokenResponse"> & {
+  /**
+   * @generated from field: bool revoked = 1;
+   */
+  revoked: boolean;
+};
+
+/**
+ * Describes the message federix.v1.RevokeEnrollmentTokenResponse.
+ * Use `create(RevokeEnrollmentTokenResponseSchema)` to create a new message.
+ */
+export declare const RevokeEnrollmentTokenResponseSchema: GenMessage<RevokeEnrollmentTokenResponse>;
+
+/**
  * @generated from service federix.v1.AdminService
  */
 export declare const AdminService: GenService<{
@@ -1555,6 +1726,30 @@ export declare const AdminService: GenService<{
     methodKind: "unary";
     input: typeof EmptySchema;
     output: typeof FlServerStatusResponseSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.AdminService.CreateEnrollmentToken
+   */
+  createEnrollmentToken: {
+    methodKind: "unary";
+    input: typeof CreateEnrollmentTokenRequestSchema;
+    output: typeof CreateEnrollmentTokenResponseSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.AdminService.ListEnrollmentTokens
+   */
+  listEnrollmentTokens: {
+    methodKind: "server_streaming";
+    input: typeof ListEnrollmentTokensRequestSchema;
+    output: typeof EnrollmentTokenEntrySchema;
+  },
+  /**
+   * @generated from rpc federix.v1.AdminService.RevokeEnrollmentToken
+   */
+  revokeEnrollmentToken: {
+    methodKind: "unary";
+    input: typeof EnrollmentTokenIdRequestSchema;
+    output: typeof RevokeEnrollmentTokenResponseSchema;
   },
 }>;
 

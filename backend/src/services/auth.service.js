@@ -8,7 +8,8 @@ import { logEvent } from '../../utils/auditLog.js';
 import { ROLE_TO_PROTO, ROLE_FROM_PROTO, dateToIso } from '../../utils/protoMappers.js';
 import { authOf } from '../lib/helpers.js';
 import { createSessionStore, ROTATED, REUSE_DETECTED } from '../lib/sessions.js';
-import { invalidArg, notFound, alreadyExists, permissionDenied, unauthenticated, resourceExhausted } from '../lib/errors.js';
+import { invalidArg, notFound, alreadyExists, permissionDenied, unauthenticated, resourceExhausted, failedPrecondition } from '../lib/errors.js';
+import { consumeEnrollmentToken, releaseEnrollmentToken } from '../lib/enrollment.js';
 
 const CREATABLE_ROLES = ['admin', 'fl_engineer', 'viewer'];
 
@@ -40,21 +41,36 @@ export function createAuthService({ redis }) {
   return {
     // Public
     async register(req) {
-      const { name, description, sdkVersion, platform } = req;
+      const { name, description, sdkVersion, platform, enrollmentToken } = req;
       if (!name || !sdkVersion || !platform) throw invalidArg('name, sdk_version and platform are required');
+      if (!config.supportedSdkVersions.includes(sdkVersion)) {
+        throw failedPrecondition(`sdk_version ${sdkVersion} is not supported; supported versions: ${config.supportedSdkVersions.join(', ')}`);
+      }
 
+      const token = config.enrollment.required || enrollmentToken ? await consumeEnrollmentToken(enrollmentToken) : null;
       const client_id = newId();
       const apiKey = newApiKey();
-      const client = await Client.create({
-        client_id,
-        api_key_hash: await hashPassword(apiKey),
-        name,
-        description,
-        sdk_version: sdkVersion,
-        platform,
-        status: 'idle',
+      let client;
+      try {
+        client = await Client.create({
+          client_id,
+          api_key_hash: await hashPassword(apiKey),
+          name,
+          description,
+          sdk_version: sdkVersion,
+          platform,
+          status: 'idle',
+          enrollment_token_id: token?.token_id ?? null,
+        });
+      } catch (err) {
+        if (token) await releaseEnrollmentToken(token.token_id);
+        throw err;
+      }
+      await logEvent({
+        actor: client_id,
+        eventType: 'client.registered',
+        details: { name, sdk_version: sdkVersion, enrollment_token_id: token?.token_id ?? null },
       });
-      await logEvent({ actor: client_id, eventType: 'client.registered', details: { name, sdk_version: sdkVersion } });
 
       return { clientId: client_id, apiKey, createdAt: dateToIso(client.created_at) };
     },
