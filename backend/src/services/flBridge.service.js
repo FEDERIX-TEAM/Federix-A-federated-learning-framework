@@ -9,7 +9,7 @@ import { computeUtilityScore } from '../../utils/utilityScore.js';
 import { logEvent } from '../../utils/auditLog.js';
 import { COMPRESSION_LEVEL_TO_PROTO, labelDistributionToMessage } from '../../utils/protoMappers.js';
 import { configForRound, configForCurrentRound, num } from '../lib/helpers.js';
-import { invalidArg, notFound, alreadyExists, failedPrecondition } from '../lib/errors.js';
+import { invalidArg, notFound, alreadyExists, failedPrecondition, notImplementedYet } from '../lib/errors.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 
 const START_TIME = Date.now();
@@ -149,6 +149,18 @@ export function createFlBridgeService() {
       }
     },
 
+    async *watchRounds() {
+      throw notImplementedYet('FlBridgeService.WatchRounds');
+    },
+
+    async getModelUploadUrl() {
+      throw notImplementedYet('FlBridgeService.GetModelUploadUrl');
+    },
+
+    async reportFlStatus() {
+      throw notImplementedYet('FlBridgeService.ReportFlStatus');
+    },
+
     async getFlConfig() {
       const config = await configForCurrentRound();
       return {
@@ -157,6 +169,9 @@ export function createFlBridgeService() {
         utilityThresholdLow: config.utility_threshold_low,
         compressionRatio: config.compression_ratio,
         minClients: config.min_clients_per_round,
+        localEpochs: config.local_epochs,
+        batchSize: config.batch_size,
+        maxClients: config.max_clients_per_round,
       };
     },
   };

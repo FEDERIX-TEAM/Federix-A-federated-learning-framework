@@ -15,6 +15,7 @@ service ClientService {
   rpc GetSelfMetrics(SelfMetricsRequest) returns (stream SelfMetricEntry);
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   rpc GetConfig(Empty) returns (ClientConfigResponse);
+  rpc PrepareUpdate(PrepareUpdateRequest) returns (PrepareUpdateResponse);
 }
 
 message ClientStatusResponse {
@@ -74,6 +75,8 @@ message SubmitUpdateRequest {
   LabelDistribution label_distribution = 5;
   int32 data_size = 6;
   int32 training_time_ms = 7;
+  string update_id = 8;
+  string sha256 = 9;
 }
 
 message SubmitUpdateResponse {
@@ -118,4 +121,24 @@ message ClientConfigResponse {
   int32 local_epochs = 2;
   int32 batch_size = 3;
   double compression_threshold = 4;
+  UtilityConfig utility = 5;
+}
+
+message PrepareUpdateRequest {
+  string round_id = 1;
+  double local_loss_before = 2;
+  double local_loss_after = 3;
+  LabelDistribution label_distribution = 4;
+  int32 data_size = 5;
+  int32 training_time_ms = 6;
+}
+
+message PrepareUpdateResponse {
+  string update_id = 1;
+  bool accepted = 2;
+  double utility_score = 3;
+  CompressionLevel compression_level = 4;
+  double compression_ratio = 5;
+  SignedUrl upload = 6;
+  string reason = 7;
 }

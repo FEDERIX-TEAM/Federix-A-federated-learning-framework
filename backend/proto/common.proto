@@ -53,3 +53,53 @@ message StringMap {
 message StatusResponse {
   bool success = 1;
 }
+
+enum RoundReadyReason {
+  ROUND_READY_REASON_UNSPECIFIED = 0;
+  ROUND_READY_REASON_DEADLINE = 1;
+  ROUND_READY_REASON_ALL_SUBMITTED = 2;
+  ROUND_READY_REASON_MAX_UPDATES = 3;
+  ROUND_READY_REASON_KEEPALIVE = 4;
+  ROUND_READY_REASON_RESUMED = 5;
+}
+
+enum FlServerState {
+  FL_SERVER_STATE_UNSPECIFIED = 0;
+  FL_SERVER_STATE_STARTING = 1;
+  FL_SERVER_STATE_IDLE = 2;
+  FL_SERVER_STATE_AGGREGATING = 3;
+  FL_SERVER_STATE_ERROR = 4;
+}
+
+message SignedUrl {
+  string url = 1;
+  string expires_at = 2;
+  string refresh_until = 3;
+  int64 max_bytes = 4;
+}
+
+message UtilityConfig {
+  double weight_quality = 1;
+  double weight_size = 2;
+  double weight_diversity = 3;
+  double size_saturation = 4;
+  int32 num_classes = 5;
+  double temperature = 6;
+  double threshold_high = 7;
+  double threshold_low = 8;
+  double ratio_high = 9;
+  double ratio_medium = 10;
+  double ratio_low = 11;
+}
+
+message UtilityConfigUpdate {
+  optional double weight_quality = 1;
+  optional double weight_size = 2;
+  optional double weight_diversity = 3;
+  optional double size_saturation = 4;
+  optional int32 num_classes = 5;
+  optional double temperature = 6;
+  optional double ratio_high = 7;
+  optional double ratio_medium = 8;
+  optional double ratio_low = 9;
+}

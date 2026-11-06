@@ -33,6 +33,22 @@ export const COMPRESSION_LEVEL_TO_PROTO = {
   full: 3,
 };
 
+export const ROUND_READY_REASON_TO_PROTO = {
+  deadline: 1,
+  all_submitted: 2,
+  max_updates: 3,
+  keepalive: 4,
+  resumed: 5,
+};
+
+export const FL_SERVER_STATE_TO_PROTO = {
+  starting: 1,
+  idle: 2,
+  aggregating: 3,
+  error: 4,
+};
+export const FL_SERVER_STATE_FROM_PROTO = Object.fromEntries(Object.entries(FL_SERVER_STATE_TO_PROTO).map(([k, v]) => [v, k]));
+
 export function dateToIso(date) {
   if (!date) return '';
   return new Date(date).toISOString();
