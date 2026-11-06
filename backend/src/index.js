@@ -8,7 +8,7 @@ import { cors as connectCors } from '@connectrpc/connect';
 import { config, assertValidConfig, assertProductionSecrets } from '../config/index.js';
 import { connectMongo, createRedisClient } from '../db.js';
 import { buildInterceptors } from './interceptors.js';
-import { registerStorageRoute } from './storage.js';
+import { registerStorageRoute, startStorageSweeper } from './storage.js';
 import { startHeartbeatWatcher } from './heartbeatWatcher.js';
 import { startClientStatusWatcher } from './clientStatusWatcher.js';
 import { getActiveConfig } from './lib/helpers.js';
@@ -93,6 +93,7 @@ async function main() {
   registerStorageRoute(app);
   const stopHeartbeatWatcher = startHeartbeatWatcher(logger);
   const stopClientStatusWatcher = startClientStatusWatcher(logger);
+  const stopStorageSweeper = startStorageSweeper(logger);
 
   let closing = false;
   const shutdown = async (signal) => {
@@ -101,6 +102,7 @@ async function main() {
     logger.info({ signal }, 'shutting down');
     stopHeartbeatWatcher();
     stopClientStatusWatcher();
+    stopStorageSweeper();
     // Long-lived Subscribe streams never end on their own; don't wait on them.
     setTimeout(() => process.exit(0), 5000).unref();
     try {

@@ -66,6 +66,18 @@ function list(name, def) {
   return (raw(name) ?? def).split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+function url(name, def) {
+  const v = raw(name) ?? def;
+  try {
+    const u = new URL(v);
+    if (!['http:', 'https:'].includes(u.protocol)) throw new Error('protocol');
+    return v.replace(/\/+$/, '');
+  } catch {
+    problems.push(`${name} must be an http(s) URL (got "${v}")`);
+    return def;
+  }
+}
+
 function notAbove(smallName, small, bigName, big) {
   if (small > big) problems.push(`${smallName} (${small}) must not be greater than ${bigName} (${big})`);
 }
@@ -110,11 +122,16 @@ export const config = {
 
   storage: {
     dir: str('STORAGE_DIR', './storage'),
+    publicBaseUrl: null,
+    partialTtlSeconds: int('UPLOAD_PARTIAL_TTL_SECONDS', 86400, { min: 1 }),
+    sweepIntervalMs: int('STORAGE_SWEEP_INTERVAL_MS', 3600000, { min: 100 }),
   },
 
   signedUrl: {
     secret: str('SIGNED_URL_SECRET', 'dev_signed_url_secret_change_me'),
     defaultTtlSeconds: int('SIGNED_URL_TTL_SECONDS', 600, { min: 1 }),
+    uploadTtlSeconds: int('UPLOAD_URL_TTL_SECONDS', 900, { min: 1 }),
+    maxLifetimeSeconds: int('SIGNED_URL_MAX_LIFETIME_SECONDS', 86400, { min: 1 }),
   },
 
   heartbeat: {
@@ -154,6 +171,7 @@ export const config = {
     selfMetricsLimitMax: int('SELF_METRICS_LIMIT_MAX', 100, { min: 1 }),
     utilityAvgWindow: int('UTILITY_AVG_WINDOW', 200, { min: 1 }),
     maxUpdateSizeMb: int('MAX_UPDATE_SIZE_MB', 256, { min: 1 }),
+    maxModelSizeMb: int('MAX_MODEL_SIZE_MB', 1024, { min: 1 }),
   },
 
   requestMetrics: {
@@ -176,6 +194,7 @@ export const config = {
 };
 
 config.maxUpdateSizeMb = config.limits.maxUpdateSizeMb;
+config.storage.publicBaseUrl = url('PUBLIC_BASE_URL', `http://127.0.0.1:${config.port}`);
 
 notAbove('CLIENT_IDLE_AFTER_MS', config.clientStatus.idleAfterMs, 'CLIENT_DISCONNECTED_AFTER_MS', config.clientStatus.disconnectedAfterMs);
 notAbove('PAGE_SIZE_DEFAULT', config.limits.pageSizeDefault, 'PAGE_SIZE_MAX', config.limits.pageSizeMax);

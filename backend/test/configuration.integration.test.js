@@ -98,9 +98,9 @@ test('SIGNED_URL_TTL_SECONDS controls how long a download URL works', async () =
   const lifetimeMs = new Date(dl.expiresAt).getTime() - Date.now();
   assert.ok(lifetimeMs > 0 && lifetimeMs <= 1000, `lifetime ${lifetimeMs}ms`);
 
-  assert.equal((await fetch(srv.baseUrl + dl.downloadUrl)).status, 404);
+  assert.equal((await fetch(dl.downloadUrl)).status, 404);
   await sleep(1200);
-  assert.equal((await fetch(srv.baseUrl + dl.downloadUrl)).status, 403);
+  assert.equal((await fetch(dl.downloadUrl)).status, 403);
 });
 
 test('EVENT_PING_INTERVAL_MS sets the keep-alive rate of the event stream', async () => {
