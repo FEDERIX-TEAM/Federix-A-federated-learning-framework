@@ -35,6 +35,9 @@ class Config:
     b: float = 0.5
     c: float = 0.3
     eps: float = 1e-8
+    size_saturation: float = 500.0
+    num_classes: int = 10
+    reject_below: float = 0.0
     tau_high: float = 0.8
     tau_low: float = 0.2
     ratios: tuple = (1.0, 0.5, 0.1)
@@ -69,6 +72,10 @@ class Config:
         for name in ("a", "b", "c"):
             need(getattr(self, name) >= 0, f"{name} must be >= 0 (got {getattr(self, name)})")
         need(self.a + self.b + self.c > 0, "at least one of a, b and c must be > 0")
+        need(self.size_saturation > 0, f"size_saturation must be > 0 (got {self.size_saturation})")
+        need(self.num_classes >= 2, f"num_classes must be >= 2 (got {self.num_classes})")
+        need(0 <= self.reject_below <= self.tau_low,
+             f"reject_below must be within [0, tau_low] (got {self.reject_below}, tau_low {self.tau_low})")
         need(0 <= self.tau_low <= self.tau_high <= 1,
              f"thresholds must satisfy 0 <= tau_low <= tau_high <= 1 (got {self.tau_low}, {self.tau_high})")
         need(len(self.ratios) == 3, f"ratios must have exactly 3 values (got {len(self.ratios)})")

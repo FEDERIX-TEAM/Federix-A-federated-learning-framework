@@ -49,3 +49,8 @@ def test_cli_rejects_bad_settings_with_exit_code_2(capsys):
 def test_cli_rejects_unknown_keys(capsys):
     assert main(["--set", "nope=1"]) == 2
     assert "known key" in capsys.readouterr().err
+
+
+def test_a_run_scores_every_update(tmp_path, small_datasets):
+    result = run(small_cfg(tmp_path, rounds=2), datasets=small_datasets, log=quiet_logger(tmp_path))
+    assert 0 < result["mean_utility"] <= 1
