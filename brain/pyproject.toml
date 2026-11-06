@@ -3,7 +3,7 @@ name = "federix"
 version = "0.1.0"
 description = "Utility-aware, communication-efficient federated learning on FedProx (CPU-only)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = ["numpy", "torch", "torchvision"]
 
 [build-system]

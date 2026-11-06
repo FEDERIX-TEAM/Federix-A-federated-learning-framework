@@ -1,13 +1,18 @@
-import logging, os
+import logging
+import os
+from datetime import datetime
 
-def get_logger(name="federix", log_dir="logs"):
-    """Logs to console AND logs/<name>.log. Safe to call many times."""
+
+def get_logger(name="federix", log_dir="logs", level="INFO"):
     log = logging.getLogger(name)
     if not log.handlers:
         os.makedirs(log_dir, exist_ok=True)
-        log.setLevel(logging.INFO)
-        fmt = logging.Formatter("%(asctime)s | %(message)s", "%H:%M:%S")
-        for h in (logging.StreamHandler(), logging.FileHandler(f"{log_dir}/{name}.log", mode="w")):
+        log.setLevel(level)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        path = os.path.join(log_dir, f"{name}-{stamp}-{os.getpid()}.log")
+        fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%H:%M:%S")
+        for h in (logging.StreamHandler(), logging.FileHandler(path, mode="a")):
             h.setFormatter(fmt)
             log.addHandler(h)
+        log.log_path = path
     return log
