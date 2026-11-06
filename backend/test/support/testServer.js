@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
 import { createClient } from '@connectrpc/connect';
@@ -172,5 +172,46 @@ export async function startTestServer({ env = {} } = {}) {
     return { id: reg.clientId, apiKey: reg.apiKey, ...bearer(session.accessToken) };
   }
 
-  return { baseUrl, dbName, storageDir, api, superAdmin, internal, newSdkClient, stop: cleanup };
+  async function submitUpdate(c, {
+    roundId,
+    localLossBefore = 1,
+    localLossAfter = 0.5,
+    dataSize = 100,
+    labelDistribution = { a: 1 },
+    trainingTimeMs = 10,
+    body,
+  }) {
+    const prepared = await api.client.prepareUpdate({
+      roundId, localLossBefore, localLossAfter, labelDistribution: { counts: labelDistribution }, dataSize, trainingTimeMs,
+    }, c);
+    if (!prepared.accepted) {
+      return { prepared, submitted: { updateId: prepared.updateId, accepted: false, compressionRequired: false } };
+    }
+    const payload = body ?? randomBytes(2048);
+    const res = await fetch(prepared.upload.url, { method: 'PUT', body: payload });
+    if (res.status !== 201) throw new Error(`update upload failed with ${res.status}: ${await res.text()}`);
+    const sha256 = createHash('sha256').update(payload).digest('hex');
+    const submitted = await api.client.submitUpdate({ roundId, updateId: prepared.updateId, sha256 }, c);
+    return { prepared, submitted, sha256, bytes: payload.length };
+  }
+
+  async function uploadModel(version, body = randomBytes(4096)) {
+    const { upload, resourcePath } = await api.fl.getModelUploadUrl({ modelVersion: version }, internal);
+    const res = await fetch(upload.url, { method: 'PUT', body });
+    if (res.status !== 201) throw new Error(`model upload failed with ${res.status}: ${await res.text()}`);
+    return { resourcePath, sha256: createHash('sha256').update(body).digest('hex'), bytes: body.length };
+  }
+
+  async function completeRound(roundId, { globalLoss = 0.4, globalAccuracy = 0.9, version } = {}) {
+    const ups = await collect(api.fl.getRoundUpdates({ roundId }, internal));
+    await api.fl.triggerRound({ roundId, updateIds: ups.map((u) => u.updateId) }, internal);
+    const newModelVersion = version ?? 1 + Math.floor(Math.random() * 1e9);
+    const model = await uploadModel(newModelVersion);
+    const done = await api.fl.completeRound({
+      roundId, newModelVersion, modelUrl: model.resourcePath, globalLoss, globalAccuracy, usedUpdateIds: ups.map((u) => u.updateId),
+    }, internal);
+    return { ...done, newModelVersion, updates: ups, model };
+  }
+
+  return { baseUrl, dbName, storageDir, api, superAdmin, internal, newSdkClient, submitUpdate, uploadModel, completeRound, stop: cleanup };
 }

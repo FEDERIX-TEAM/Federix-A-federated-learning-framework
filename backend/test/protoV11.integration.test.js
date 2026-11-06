@@ -47,15 +47,15 @@ test('the new RPCs exist in the generated contract', () => {
   assert.equal(FlServerState.AGGREGATING, 3);
 });
 
-test('PrepareUpdate: SDK clients reach the not-yet-implemented handler, others are refused', async () => {
-  await assert.rejects(srv.api.client.prepareUpdate({ roundId: 'r' }, client), unimplemented);
+test('PrepareUpdate: SDK clients reach the handler, others are refused', async () => {
+  await assert.rejects(srv.api.client.prepareUpdate({ roundId: 'no-such-round', localLossBefore: 1, localLossAfter: 0.5, dataSize: 1, trainingTimeMs: 1 }, client), isCode(Code.NotFound));
   await assert.rejects(srv.api.client.prepareUpdate({ roundId: 'r' }, srv.superAdmin), isCode(Code.PermissionDenied));
   await assert.rejects(srv.api.client.prepareUpdate({ roundId: 'r' }), isCode(Code.Unauthenticated));
 });
 
 test('WatchRounds, GetModelUploadUrl and ReportFlStatus need the internal token', async () => {
   await assert.rejects(collect(srv.api.fl.watchRounds({ workerId: 'w1' }, srv.internal)), unimplemented);
-  await assert.rejects(srv.api.fl.getModelUploadUrl({ modelVersion: 1 }, srv.internal), unimplemented);
+  assert.match((await srv.api.fl.getModelUploadUrl({ modelVersion: 1 }, srv.internal)).upload.url, /\/storage\/models\/1\?/);
   await assert.rejects(srv.api.fl.reportFlStatus({ workerId: 'w1', state: FlServerState.IDLE }, srv.internal), unimplemented);
 
   await assert.rejects(collect(srv.api.fl.watchRounds({}, client)), isCode(Code.Unauthenticated));
@@ -88,31 +88,25 @@ test('GetFlConfig now includes local_epochs, batch_size and max_clients', async 
 
 test('ListModels reports the stored model format', async () => {
   const version = 1 + Math.floor(Math.random() * 1e9);
+  await srv.uploadModel(version);
   await srv.api.fl.pushModel({ modelVersion: version, weightsUrl: `/models/${version}` }, srv.internal);
   const m = (await collect(srv.api.admin.listModels({}, srv.superAdmin))).find((x) => x.modelVersion === version);
   assert.equal(m.format, 'bin');
 });
 
-test('existing calls keep working when they send the new optional fields', async () => {
-  await srv.api.admin.updateConfig({ minClientsPerRound: 1, utilityThresholdLow: 0.05, utilityThresholdHigh: 0.5 }, srv.superAdmin);
+test('the old one-shot SubmitUpdate with a client-supplied URL is refused with guidance', async () => {
+  await srv.api.admin.updateConfig({ minClientsPerRound: 1 }, srv.superAdmin);
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
-  await srv.api.client.joinRound({ roundId: round.roundId }, client);
-  const res = await srv.api.client.submitUpdate({
-    roundId: round.roundId, deltaWeightsUrl: 's3://u.bin', localLossBefore: 1, localLossAfter: 0.2,
-    labelDistribution: { counts: { a: 5, b: 5 } }, dataSize: 500, trainingTimeMs: 10,
-    updateId: 'ignored-for-now', sha256: 'f'.repeat(64),
-  }, client);
-  assert.equal(res.accepted, true);
-
-  const ups = await collect(srv.api.fl.getRoundUpdates({ roundId: round.roundId }, srv.internal));
-  await srv.api.fl.triggerRound({ roundId: round.roundId, updateIds: ups.map((u) => u.updateId) }, srv.internal);
-  const done = await srv.api.fl.completeRound({
-    roundId: round.roundId,
-    newModelVersion: 1 + Math.floor(Math.random() * 1e9),
-    modelUrl: '/models/x',
-    globalLoss: 0.3,
-    globalAccuracy: 0.9,
-    usedUpdateIds: ups.map((u) => u.updateId),
-  }, srv.internal);
-  assert.equal(done.success, true);
+  try {
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 500 }, client);
+    await assert.rejects(
+      srv.api.client.submitUpdate({
+        roundId: round.roundId, deltaWeightsUrl: 'http://attacker.example/x', localLossBefore: 1, localLossAfter: 0.2,
+        labelDistribution: { counts: { a: 5 } }, dataSize: 500, trainingTimeMs: 10,
+      }, client),
+      (err) => isCode(Code.InvalidArgument)(err) && /call PrepareUpdate/.test(err.message)
+    );
+  } finally {
+    await srv.api.admin.stopRound({ roundId: round.roundId }, srv.superAdmin);
+  }
 });

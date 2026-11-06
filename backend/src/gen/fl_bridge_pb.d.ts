@@ -185,6 +185,31 @@ export declare type RoundUpdateEntry = Message<"federix.v1.RoundUpdateEntry"> & 
    * @generated from field: federix.v1.LabelDistribution label_distribution = 5;
    */
   labelDistribution?: LabelDistribution | undefined;
+
+  /**
+   * @generated from field: string sha256 = 6;
+   */
+  sha256: string;
+
+  /**
+   * @generated from field: int64 bytes = 7;
+   */
+  bytes: bigint;
+
+  /**
+   * @generated from field: double compression_ratio = 8;
+   */
+  compressionRatio: number;
+
+  /**
+   * @generated from field: int32 data_size = 9;
+   */
+  dataSize: number;
+
+  /**
+   * @generated from field: federix.v1.CompressionLevel compression_level = 10;
+   */
+  compressionLevel: CompressionLevel;
 };
 
 /**

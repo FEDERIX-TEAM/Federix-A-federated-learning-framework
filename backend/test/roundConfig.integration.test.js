@@ -25,16 +25,11 @@ after(async () => {
   await srv?.stop();
 });
 
-function submit(c, before, after, dataSize, counts) {
-  return srv.api.client.submitUpdate({
-    roundId: round.roundId,
-    deltaWeightsUrl: `s3://bucket/${c.id}.bin`,
-    localLossBefore: before,
-    localLossAfter: after,
-    labelDistribution: { counts },
-    dataSize,
-    trainingTimeMs: 1000,
-  }, c);
+async function submit(c, before, after, dataSize, counts) {
+  const { submitted } = await srv.submitUpdate(c, {
+    roundId: round.roundId, localLossBefore: before, localLossAfter: after, labelDistribution: counts, dataSize, trainingTimeMs: 1000,
+  });
+  return submitted;
 }
 
 test('a round stores the config that was live when it started', async () => {
@@ -44,7 +39,7 @@ test('a round stores the config that was live when it started', async () => {
 
   round = await api.admin.startRound({ maxClients: 10, deadlineSeconds: 600 }, superAdmin);
   for (const c of [good, mediocre, poor]) {
-    assert.equal((await api.client.joinRound({ roundId: round.roundId, localDataSize: 1000 }, c)).accepted, true);
+    assert.equal((await api.client.joinRound({ roundId: round.roundId, localDataSize: 100000 }, c)).accepted, true);
   }
 
   const stored = await Round.findOne({ round_id: round.roundId }).lean();

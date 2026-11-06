@@ -70,8 +70,8 @@ test('HEARTBEAT_TIMEOUT_MS drops a silent participant and keeps an active one', 
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
     const [active, silent] = await Promise.all([srv.newSdkClient('active'), srv.newSdkClient('silent')]);
-    await srv.api.client.joinRound({ roundId: round.roundId }, active);
-    await srv.api.client.joinRound({ roundId: round.roundId }, silent);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, active);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, silent);
 
     const deadline = Date.now() + 1600;
     while (Date.now() < deadline) {
@@ -91,14 +91,15 @@ test('HEARTBEAT_TIMEOUT_MS drops a silent participant and keeps an active one', 
 
 test('SIGNED_URL_TTL_SECONDS controls how long a download URL works', async () => {
   const version = 1 + Math.floor(Math.random() * 1e9);
-  await srv.api.fl.pushModel({ modelVersion: version, weightsUrl: 's3://m/x.bin' }, srv.internal);
+  const { resourcePath } = await srv.uploadModel(version);
+  await srv.api.fl.pushModel({ modelVersion: version, weightsUrl: resourcePath }, srv.internal);
   const c = await srv.newSdkClient('downloader');
 
   const dl = await srv.api.client.getModelDownload({ modelVersion: version }, c);
   const lifetimeMs = new Date(dl.expiresAt).getTime() - Date.now();
   assert.ok(lifetimeMs > 0 && lifetimeMs <= 1000, `lifetime ${lifetimeMs}ms`);
 
-  assert.equal((await fetch(dl.downloadUrl)).status, 404);
+  assert.equal((await fetch(dl.downloadUrl)).status, 200);
   await sleep(1200);
   assert.equal((await fetch(dl.downloadUrl)).status, 403);
 });
@@ -158,11 +159,8 @@ test('CLIENT_HISTORY_LIMIT caps the history in GetClientDetail', async () => {
   const c = await srv.newSdkClient('history');
   for (let i = 0; i < 2; i += 1) {
     const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
-    await srv.api.client.joinRound({ roundId: round.roundId }, c);
-    await srv.api.client.submitUpdate({
-      roundId: round.roundId, deltaWeightsUrl: 's3://u.bin', localLossBefore: 1, localLossAfter: 0.5,
-      labelDistribution: { counts: { a: 1 } }, dataSize: 100, trainingTimeMs: 10,
-    }, c);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, c);
+    await srv.submitUpdate(c, { roundId: round.roundId, dataSize: 100 });
     await srv.api.admin.stopRound({ roundId: round.roundId }, srv.superAdmin);
   }
   const detail = await srv.api.admin.getClientDetail({ clientId: c.id }, srv.superAdmin);

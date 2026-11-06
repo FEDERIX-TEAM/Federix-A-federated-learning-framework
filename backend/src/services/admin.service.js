@@ -104,7 +104,7 @@ export function createAdminService({ redis }) {
       if (!client) throw notFound('Client not found');
 
       const live = await getActiveConfig();
-      const updates = await Update.find({ client_id: client.client_id }).sort({ submitted_at: -1 }).limit(appConfig.limits.clientHistoryLimit);
+      const updates = await Update.find({ client_id: client.client_id }).sort({ prepared_at: -1 }).limit(appConfig.limits.clientHistoryLimit);
       return {
         clientId: client.client_id,
         name: client.name,
@@ -277,7 +277,7 @@ export function createAdminService({ redis }) {
       round.completed_at = new Date();
       await round.save();
       await Update.updateMany(
-        { round_id: round.round_id, status: { $in: ['pending', 'accepted', 'compressed'] } },
+        { round_id: round.round_id, status: { $in: ['pending', 'prepared', 'accepted', 'compressed'] } },
         { status: 'rejected', reason: 'round aborted' }
       );
 
@@ -289,7 +289,7 @@ export function createAdminService({ redis }) {
 
     async *listRoundUpdates(req) {
       if (!req.roundId) throw invalidArg('round_id is required');
-      const updates = await Update.find({ round_id: req.roundId }).sort({ submitted_at: 1 });
+      const updates = await Update.find({ round_id: req.roundId }).sort({ prepared_at: 1 });
       for (const u of updates) {
         yield {
           updateId: u.update_id,
@@ -320,7 +320,7 @@ export function createAdminService({ redis }) {
     async *getClientMetrics(req) {
       const n = metricsRounds(req);
       const filter = req.clientId ? { client_id: req.clientId } : {};
-      const updates = await Update.find(filter).sort({ submitted_at: -1 }).limit(req.clientId ? n : n * appConfig.limits.clientMetricsScanFactor);
+      const updates = await Update.find(filter).sort({ prepared_at: -1 }).limit(req.clientId ? n : n * appConfig.limits.clientMetricsScanFactor);
 
       const byClient = new Map();
       for (const u of updates) {
@@ -336,14 +336,18 @@ export function createAdminService({ redis }) {
       const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(metricsRounds(req));
       for (const r of rounds.reverse()) {
         const updates = await Update.find({ round_id: r.round_id });
-        const compressed = updates.filter((u) => u.compression_level && u.compression_level !== 'none');
-        // Bytes are approximated from reported data_size — real accounting belongs to the transport/storage layer.
+        const uploaded = updates.filter((u) => u.bytes_uploaded !== null && u.delta_weights_url !== null);
+        const received = uploaded.reduce((s, u) => s + u.bytes_uploaded, 0);
+        const base = r.model_version_before == null ? null : await GlobalModel.findOne({ model_version: r.model_version_before }).select('size_bytes').lean();
+        const dense = base?.size_bytes ?? 0;
+        const saved = dense > 0 ? uploaded.reduce((s, u) => s + Math.max(0, dense - u.bytes_uploaded), 0) : 0;
         yield {
           roundNumber: r.round_number,
-          bytesReceived: BigInt(updates.reduce((s, u) => s + (u.data_size || 0) * 4, 0)),
-          bytesSaved: BigInt(compressed.reduce((s, u) => s + (u.data_size || 0) * 2, 0)),
-          fullCount: updates.filter((u) => u.compression_level === 'none' && u.status !== 'rejected').length,
-          compressedCount: compressed.length,
+          bytesReceived: BigInt(received),
+          bytesMeasured: BigInt(received),
+          bytesSaved: BigInt(saved),
+          fullCount: uploaded.filter((u) => u.compression_level === 'none').length,
+          compressedCount: uploaded.filter((u) => u.compression_level === 'partial' || u.compression_level === 'full').length,
           skippedCount: updates.filter((u) => u.status === 'rejected').length,
         };
       }
@@ -493,6 +497,7 @@ export function createAdminService({ redis }) {
           sizeBytes: BigInt(m.size_bytes || 0),
           createdAt: dateToIso(m.created_at),
           format: m.format ?? '',
+          sha256: m.sha256 ?? '',
         };
       }
     },

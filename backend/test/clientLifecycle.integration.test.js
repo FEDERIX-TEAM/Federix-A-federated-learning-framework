@@ -77,7 +77,7 @@ test('a silent client goes active -> idle -> disconnected, and a heartbeat bring
   const c = await srv.newSdkClient('presence');
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
-    await srv.api.client.joinRound({ roundId: round.roundId }, c);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, c);
     assert.equal(await statusOf(c), 'active');
     assert.ok(await waitFor(async () => (await statusOf(c)) === 'idle'), 'did not become idle');
     assert.ok(await waitFor(async () => (await statusOf(c)) === 'disconnected'), 'did not become disconnected');
@@ -133,8 +133,8 @@ test('banning a client mid-round removes it, rejects its heartbeat and ends its 
   const [banned, other] = await Promise.all([srv.newSdkClient('to-ban'), srv.newSdkClient('stays')]);
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
-    await srv.api.client.joinRound({ roundId: round.roundId }, banned);
-    await srv.api.client.joinRound({ roundId: round.roundId }, other);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, banned);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, other);
 
     await srv.api.admin.banClient({ clientId: banned.id, reason: 'abuse', durationHours: 1 }, srv.superAdmin);
 
@@ -156,7 +156,7 @@ test('a banned client with a fresh token still cannot heartbeat', async () => {
   const c = await srv.newSdkClient('banned-heartbeat');
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
-    await srv.api.client.joinRound({ roundId: round.roundId }, c);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 100 }, c);
     await Client.updateOne({ client_id: c.id }, { banned_until: new Date(Date.now() + 3600_000), status: 'banned' });
     await assert.rejects(
       srv.api.client.heartbeat({ roundId: round.roundId }, c),

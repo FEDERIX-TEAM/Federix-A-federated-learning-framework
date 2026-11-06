@@ -9,6 +9,7 @@ const globalModelSchema = new mongoose.Schema(
     weights_url: { type: String, required: true },
     format: { type: String, default: 'bin' },
     size_bytes: { type: Number, default: 0 },
+    sha256: { type: String, default: null },
 
     metrics: {
       global_loss: { type: Number, default: null },
