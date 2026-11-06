@@ -10,7 +10,7 @@ import { storage } from '../storage.js';
 import { config as appConfig } from '../../config/index.js';
 import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
-import { labelEntropy } from '../../utils/utilityScore.js';
+import { labelEntropy, utilityConfigToProto } from '../../utils/utilityScore.js';
 import { logEvent } from '../../utils/auditLog.js';
 import {
   ROLE_TO_PROTO,
@@ -103,13 +103,14 @@ export function createAdminService({ redis }) {
       const client = await Client.findOne({ client_id: req.clientId });
       if (!client) throw notFound('Client not found');
 
+      const live = await getActiveConfig();
       const updates = await Update.find({ client_id: client.client_id }).sort({ submitted_at: -1 }).limit(appConfig.limits.clientHistoryLimit);
       return {
         clientId: client.client_id,
         name: client.name,
         history: updates.map((u) => ({ roundId: u.round_id, status: u.status, submittedAt: dateToIso(u.submitted_at) })),
         utilityScores: updates.map((u) => ({ roundId: u.round_id, score: num(u.utility_score) })),
-        labelEntropyAvg: Number(mean(updates.map((u) => labelEntropy(u.label_distribution))).toFixed(4)),
+        labelEntropyAvg: Number(mean(updates.map((u) => labelEntropy(u.label_distribution, live.num_classes))).toFixed(4)),
       };
     },
 
@@ -386,9 +387,21 @@ export function createAdminService({ redis }) {
         maxRoundDurationSeconds: 'max_round_duration_seconds',
         utilityThresholdHigh: 'utility_threshold_high',
         utilityThresholdLow: 'utility_threshold_low',
-        compressionRatio: 'compression_ratio',
+        compressionRatio: 'ratio_medium',
         localEpochs: 'local_epochs',
         batchSize: 'batch_size',
+      };
+      const utilityColumn = {
+        weightQuality: 'weight_quality',
+        weightSize: 'weight_size',
+        weightDiversity: 'weight_diversity',
+        sizeSaturation: 'size_saturation',
+        numClasses: 'num_classes',
+        temperature: 'temperature',
+        ratioHigh: 'ratio_high',
+        ratioMedium: 'ratio_medium',
+        ratioLow: 'ratio_low',
+        rejectBelow: 'reject_below',
       };
 
       const diff = {};
@@ -397,6 +410,16 @@ export function createAdminService({ redis }) {
         requireFinite(v, column[k]);
         diff[column[k]] = v;
       }
+      for (const [k, col] of Object.entries(utilityColumn)) {
+        const v = req.utility?.[k];
+        if (v === undefined) continue;
+        requireFinite(v, col);
+        if (col === 'ratio_medium' && diff.ratio_medium !== undefined && diff.ratio_medium !== v) {
+          throw invalidArg('compression_ratio and utility.ratio_medium are the same setting; send only one');
+        }
+        diff[col] = v;
+      }
+      if (diff.ratio_medium !== undefined) diff.compression_ratio = diff.ratio_medium;
       if (Object.keys(diff).length === 0) throw invalidArg('No config fields supplied');
 
       const current = (await getActiveConfig()).toObject();
@@ -410,7 +433,24 @@ export function createAdminService({ redis }) {
         if (merged[key] < 0 || merged[key] > 1) throw invalidArg(`${key} must be within [0, 1]`);
       }
       if (merged.utility_threshold_low > merged.utility_threshold_high) throw invalidArg('utility_threshold_low must be <= utility_threshold_high');
-      if (merged.compression_ratio <= 0 || merged.compression_ratio > 1) throw invalidArg('compression_ratio must be within (0, 1]');
+      for (const key of ['weight_quality', 'weight_size', 'weight_diversity']) {
+        if (merged[key] < 0) throw invalidArg(`${key} must be >= 0`);
+      }
+      if (merged.weight_quality + merged.weight_size + merged.weight_diversity <= 0) {
+        throw invalidArg('at least one of weight_quality, weight_size and weight_diversity must be > 0');
+      }
+      if (merged.size_saturation <= 0) throw invalidArg('size_saturation must be > 0');
+      if (!Number.isInteger(merged.num_classes) || merged.num_classes < 2) throw invalidArg('num_classes must be an integer >= 2');
+      if (merged.temperature <= 0) throw invalidArg('temperature must be > 0');
+      for (const key of ['ratio_high', 'ratio_medium', 'ratio_low']) {
+        if (merged[key] <= 0 || merged[key] > 1) throw invalidArg(`${key} must be within (0, 1]`);
+      }
+      if (!(merged.ratio_high >= merged.ratio_medium && merged.ratio_medium >= merged.ratio_low)) {
+        throw invalidArg('ratios must satisfy ratio_high >= ratio_medium >= ratio_low');
+      }
+      if (merged.reject_below < 0 || merged.reject_below > merged.utility_threshold_low) {
+        throw invalidArg('reject_below must be within [0, utility_threshold_low]');
+      }
 
       const actor = authOf(ctx).sub;
       const updated = await SystemConfig.findOneAndUpdate(
@@ -561,9 +601,10 @@ function toConfigResponse(c) {
     maxRoundDurationSeconds: c.max_round_duration_seconds,
     utilityThresholdHigh: c.utility_threshold_high,
     utilityThresholdLow: c.utility_threshold_low,
-    compressionRatio: c.compression_ratio,
+    compressionRatio: c.ratio_medium,
     maxClientsPerRound: c.max_clients_per_round,
     localEpochs: c.local_epochs,
     batchSize: c.batch_size,
+    utility: utilityConfigToProto(c),
   };
 }

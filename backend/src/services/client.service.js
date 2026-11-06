@@ -5,7 +5,7 @@ import { Update } from '../../models/Update.js';
 import { GlobalModel } from '../../models/GlobalModel.js';
 import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
-import { computeUtilityScore } from '../../utils/utilityScore.js';
+import { computeUtilityScore, utilityTier, utilityConfigToProto } from '../../utils/utilityScore.js';
 import { dateToIso, UPDATE_STATUS_TO_PROTO, stringMapToPlain, labelDistributionFromMessage } from '../../utils/protoMappers.js';
 import { authOf, configForRound, configForCurrentRound, clampN, joinedCount, num } from '../lib/helpers.js';
 import { invalidArg, notFound, permissionDenied, failedPrecondition, notImplementedYet } from '../lib/errors.js';
@@ -193,23 +193,13 @@ export function createClientService() {
         localLossAfter: req.localLossAfter,
         dataSize: req.dataSize,
         labelDistribution,
-      });
+      }, config);
 
-      let status = 'accepted';
-      let compressionRequired = false;
-      let compressionLevel = 'none';
-      let reason = null;
-      if (utility === null) {
-        status = 'rejected';
-        reason = 'utility score could not be computed from the submitted metrics';
-      } else if (utility < config.utility_threshold_low) {
-        status = 'rejected';
-        reason = `utility score ${utility} below minimum threshold ${config.utility_threshold_low}`;
-      } else if (utility < config.utility_threshold_high) {
-        status = 'compressed';
-        compressionRequired = true;
-        compressionLevel = 'partial';
-      }
+      const tier = utilityTier(utility, config);
+      const status = tier.status;
+      const compressionLevel = tier.level;
+      const compressionRequired = tier.level !== null && tier.level !== 'none';
+      const { reason } = tier;
 
       const update = await Update.findOneAndUpdate(
         { round_id: req.roundId, client_id: clientId },
@@ -314,6 +304,7 @@ export function createClientService() {
         localEpochs: config.local_epochs,
         batchSize: config.batch_size,
         compressionThreshold: config.utility_threshold_high,
+        utility: utilityConfigToProto(config),
       };
     },
   };

@@ -90,6 +90,7 @@ message UtilityConfig {
   double ratio_high = 9;
   double ratio_medium = 10;
   double ratio_low = 11;
+  double reject_below = 12;
 }
 
 message UtilityConfigUpdate {
@@ -102,4 +103,5 @@ message UtilityConfigUpdate {
   optional double ratio_high = 7;
   optional double ratio_medium = 8;
   optional double ratio_low = 9;
+  optional double reject_below = 10;
 }

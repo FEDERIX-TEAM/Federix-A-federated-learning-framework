@@ -39,7 +39,7 @@ function submit(c, before, after, dataSize, counts) {
 
 test('a round stores the config that was live when it started', async () => {
   const { api, superAdmin } = srv;
-  await api.admin.updateConfig({ minClientsPerRound: 1, ...ORIGINAL }, superAdmin);
+  await api.admin.updateConfig({ minClientsPerRound: 1, ...ORIGINAL, utility: { rejectBelow: 0.05 } }, superAdmin);
   [good, mediocre, poor] = await Promise.all(['good', 'mediocre', 'poor'].map((n) => srv.newSdkClient(n)));
 
   round = await api.admin.startRound({ maxClients: 10, deadlineSeconds: 600 }, superAdmin);
@@ -76,7 +76,7 @@ test('updates in the running round are scored with the round snapshot, not the l
   const goodStatus = await srv.api.client.getUpdateStatus({ roundId: round.roundId }, good);
   assert.equal(goodStatus.status, UpdateStatus.ACCEPTED);
   const poorStatus = await srv.api.client.getUpdateStatus({ roundId: round.roundId }, poor);
-  assert.match(poorStatus.reason, /below minimum threshold 0\.05$/);
+  assert.match(poorStatus.reason, /below the rejection threshold 0\.05$/);
 });
 
 test('clients and the FL server read the running round config', async () => {

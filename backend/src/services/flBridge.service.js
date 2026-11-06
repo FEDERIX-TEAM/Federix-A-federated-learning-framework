@@ -5,7 +5,7 @@ import { GlobalModel } from '../../models/GlobalModel.js';
 import { config as appConfig } from '../../config/index.js';
 import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
-import { computeUtilityScore } from '../../utils/utilityScore.js';
+import { computeUtilityScore, utilityTier, utilityConfigToProto } from '../../utils/utilityScore.js';
 import { logEvent } from '../../utils/auditLog.js';
 import { COMPRESSION_LEVEL_TO_PROTO, labelDistributionToMessage } from '../../utils/protoMappers.js';
 import { configForRound, configForCurrentRound, num } from '../lib/helpers.js';
@@ -140,10 +140,8 @@ export function createFlBridgeService() {
           localLossAfter: u.local_loss_after,
           dataSize: u.data_size,
           labelDistribution: u.label_distribution,
-        });
-        let level = 'none';
-        if (score === null || score < config.utility_threshold_low) level = 'full';
-        else if (score < config.utility_threshold_high) level = 'partial';
+        }, config);
+        const level = utilityTier(score, config).level ?? 'full';
 
         yield { updateId: u.update_id, utilityScore: num(score), compressionLevel: COMPRESSION_LEVEL_TO_PROTO[level] };
       }
@@ -167,8 +165,9 @@ export function createFlBridgeService() {
         mu: config.mu,
         utilityThresholdHigh: config.utility_threshold_high,
         utilityThresholdLow: config.utility_threshold_low,
-        compressionRatio: config.compression_ratio,
+        compressionRatio: config.ratio_medium,
         minClients: config.min_clients_per_round,
+        utility: utilityConfigToProto(config),
         localEpochs: config.local_epochs,
         batchSize: config.batch_size,
         maxClients: config.max_clients_per_round,
