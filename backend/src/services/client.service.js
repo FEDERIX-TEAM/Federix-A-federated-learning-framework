@@ -8,7 +8,7 @@ import * as signedUrl from '../../utils/signedUrl.js';
 import { computeUtilityScore } from '../../utils/utilityScore.js';
 import { dateToIso, UPDATE_STATUS_TO_PROTO, stringMapToPlain, labelDistributionFromMessage } from '../../utils/protoMappers.js';
 import { authOf, configForRound, configForCurrentRound, clampN, joinedCount, num } from '../lib/helpers.js';
-import { invalidArg, notFound, permissionDenied, failedPrecondition } from '../lib/errors.js';
+import { invalidArg, notFound, permissionDenied, failedPrecondition, notImplementedYet } from '../lib/errors.js';
 import { requireFinite, requireLabelDistribution } from '../lib/validate.js';
 import { publish, ADMIN_ROLES } from '../lib/events.js';
 
@@ -301,6 +301,10 @@ export function createClientService() {
       await Client.updateOne({ client_id: clientId }, { last_seen: new Date(), status: 'active' });
 
       return { ok: true, serverTime: new Date().toISOString() };
+    },
+
+    async prepareUpdate() {
+      throw notImplementedYet('ClientService.PrepareUpdate');
     },
 
     async getConfig() {

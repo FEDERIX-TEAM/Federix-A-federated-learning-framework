@@ -21,7 +21,7 @@ import {
   dateToIso,
 } from '../../utils/protoMappers.js';
 import { authOf, getActiveConfig, clampN, parseDate, num, joinedCount, giniCoefficient } from '../lib/helpers.js';
-import { invalidArg, notFound, failedPrecondition } from '../lib/errors.js';
+import { invalidArg, notFound, failedPrecondition, notImplementedYet } from '../lib/errors.js';
 import { requireFinite } from '../lib/validate.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 
@@ -452,6 +452,7 @@ export function createAdminService({ redis }) {
           accuracy: num(m.metrics?.global_accuracy),
           sizeBytes: BigInt(m.size_bytes || 0),
           createdAt: dateToIso(m.created_at),
+          format: m.format ?? '',
         };
       }
     },
@@ -530,6 +531,10 @@ export function createAdminService({ redis }) {
       return { userId: user.user_id, newRole: ROLE_TO_PROTO[user.role] };
     },
 
+    async getFlServerStatus() {
+      throw notImplementedYet('AdminService.GetFlServerStatus');
+    },
+
     async deleteUser(req, ctx) {
       const actor = authOf(ctx).sub;
       if (!req.userId) throw invalidArg('user_id is required');
@@ -558,5 +563,7 @@ function toConfigResponse(c) {
     utilityThresholdLow: c.utility_threshold_low,
     compressionRatio: c.compression_ratio,
     maxClientsPerRound: c.max_clients_per_round,
+    localEpochs: c.local_epochs,
+    batchSize: c.batch_size,
   };
 }

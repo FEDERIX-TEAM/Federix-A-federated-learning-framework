@@ -25,6 +25,7 @@ export const RBAC_RULES = {
   'ClientService.GetSelfMetrics': ['sdk_client'],
   'ClientService.Heartbeat': ['sdk_client'],
   'ClientService.GetConfig': ['sdk_client'],
+  'ClientService.PrepareUpdate': ['sdk_client'],
 
   // FlBridgeService — internal shared-secret, except GetFlStatus (dual: internal OR super_admin JWT)
   'FlBridgeService.TriggerRound': 'internal',
@@ -34,6 +35,9 @@ export const RBAC_RULES = {
   'FlBridgeService.GetFlStatus': 'internal-or-super-admin',
   'FlBridgeService.ComputeUtility': 'internal',
   'FlBridgeService.GetFlConfig': 'internal',
+  'FlBridgeService.WatchRounds': 'internal',
+  'FlBridgeService.GetModelUploadUrl': 'internal',
+  'FlBridgeService.ReportFlStatus': 'internal',
 
   // AdminService
   'AdminService.GetOverview': ['super_admin', 'admin', 'fl_engineer', 'viewer'],
@@ -61,6 +65,7 @@ export const RBAC_RULES = {
   'AdminService.ListUsers': ['super_admin'],
   'AdminService.UpdateUserRole': ['super_admin'],
   'AdminService.DeleteUser': ['super_admin'],
+  'AdminService.GetFlServerStatus': ['super_admin', 'admin', 'fl_engineer', 'viewer'],
 
   // SystemService
   'SystemService.HealthCheck': 'public',

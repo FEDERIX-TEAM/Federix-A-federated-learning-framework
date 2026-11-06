@@ -12,6 +12,9 @@ service FlBridgeService {
   rpc GetFlStatus(Empty) returns (FlStatusResponse);
   rpc ComputeUtility(ComputeUtilityRequest) returns (stream UtilityResult);
   rpc GetFlConfig(Empty) returns (FlConfigResponse);
+  rpc WatchRounds(WatchRoundsRequest) returns (stream RoundReadyEvent);
+  rpc GetModelUploadUrl(ModelUploadUrlRequest) returns (ModelUploadUrlResponse);
+  rpc ReportFlStatus(FlStatusReport) returns (FlStatusReportAck);
 }
 
 message TriggerRoundRequest {
@@ -35,6 +38,7 @@ message CompleteRoundRequest {
   string model_url = 3;
   double global_loss = 4;
   double global_accuracy = 5;
+  repeated string used_update_ids = 6;
 }
 
 message CompleteRoundResponse {
@@ -91,4 +95,44 @@ message FlConfigResponse {
   double utility_threshold_low = 3;
   double compression_ratio = 4;
   int32 min_clients = 5;
+  int32 local_epochs = 6;
+  int32 batch_size = 7;
+  UtilityConfig utility = 8;
+  int32 max_clients = 9;
+}
+
+message WatchRoundsRequest {
+  string worker_id = 1;
+}
+
+message RoundReadyEvent {
+  string round_id = 1;
+  int32 round_number = 2;
+  RoundReadyReason reason = 3;
+  int32 update_count = 4;
+  int32 model_version_before = 5;
+  string ready_at = 6;
+}
+
+message ModelUploadUrlRequest {
+  int32 model_version = 1;
+}
+
+message ModelUploadUrlResponse {
+  SignedUrl upload = 1;
+  string resource_path = 2;
+}
+
+message FlStatusReport {
+  string worker_id = 1;
+  FlServerState state = 2;
+  string current_round_id = 3;
+  string version = 4;
+  string message = 5;
+  string last_error = 6;
+}
+
+message FlStatusReportAck {
+  bool accepted = 1;
+  string server_time = 2;
 }

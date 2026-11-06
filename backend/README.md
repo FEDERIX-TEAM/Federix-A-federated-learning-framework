@@ -8,7 +8,7 @@ dashboard API, and a live event stream.
 Connect**) · MongoDB + Mongoose · Redis (token blacklist + maintenance flag; auto-falls back to an
 in-memory stub in dev) · JWT · bcrypt.
 
-All 6 services / 57 RPCs defined in `proto/` are implemented.
+6 services / 62 RPCs are defined in `proto/`. 57 are implemented; the 5 added in protocol v1.1 (`PrepareUpdate`, `WatchRounds`, `GetModelUploadUrl`, `ReportFlStatus`, `GetFlServerStatus`) answer `Unimplemented` until their features land.
 
 ## Quick start
 
@@ -167,6 +167,7 @@ Generated from `interceptors/rbacRules.js`.
 | GetSelfMetrics | sdk_client |
 | Heartbeat | sdk_client |
 | GetConfig | sdk_client |
+| PrepareUpdate | sdk_client |
 
 #### FlBridgeService
 
@@ -179,6 +180,9 @@ Generated from `interceptors/rbacRules.js`.
 | GetFlStatus | internal token or super_admin |
 | ComputeUtility | internal token |
 | GetFlConfig | internal token |
+| WatchRounds | internal token |
+| GetModelUploadUrl | internal token |
+| ReportFlStatus | internal token |
 
 #### AdminService
 
@@ -209,6 +213,7 @@ Generated from `interceptors/rbacRules.js`.
 | ListUsers | super_admin |
 | UpdateUserRole | super_admin |
 | DeleteUser | super_admin |
+| GetFlServerStatus | super_admin, admin, fl_engineer, viewer |
 
 #### SystemService
 
@@ -271,7 +276,7 @@ snapshots the config at start). Participants who miss 3 heartbeats (90s) are mar
 ## Layout
 
 ```
-proto/            API contracts (source of truth) — buf.yaml / buf.gen.yaml
+proto/            API contracts (source of truth) — buf.yaml / buf.gen.yaml; `npm run proto:breaking` checks changes against main
 src/gen/          generated code (committed). Regenerate after editing protos: npm run generate
 src/index.js      server bootstrap: Fastify + Connect, CORS, FL IP allowlist, graceful shutdown
 src/interceptors.js   error-sanitising/logging interceptor + wiring of the two below

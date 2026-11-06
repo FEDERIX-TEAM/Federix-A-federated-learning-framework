@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { EmptySchema, LabelDistribution, StringMap, UpdateStatus } from "./common_pb.js";
+import type { CompressionLevel, EmptySchema, LabelDistribution, SignedUrl, StringMap, UpdateStatus, UtilityConfig } from "./common_pb.js";
 
 /**
  * Describes the file client.proto.
@@ -262,6 +262,16 @@ export declare type SubmitUpdateRequest = Message<"federix.v1.SubmitUpdateReques
    * @generated from field: int32 training_time_ms = 7;
    */
   trainingTimeMs: number;
+
+  /**
+   * @generated from field: string update_id = 8;
+   */
+  updateId: string;
+
+  /**
+   * @generated from field: string sha256 = 9;
+   */
+  sha256: string;
 };
 
 /**
@@ -450,6 +460,11 @@ export declare type ClientConfigResponse = Message<"federix.v1.ClientConfigRespo
    * @generated from field: double compression_threshold = 4;
    */
   compressionThreshold: number;
+
+  /**
+   * @generated from field: federix.v1.UtilityConfig utility = 5;
+   */
+  utility?: UtilityConfig | undefined;
 };
 
 /**
@@ -457,6 +472,93 @@ export declare type ClientConfigResponse = Message<"federix.v1.ClientConfigRespo
  * Use `create(ClientConfigResponseSchema)` to create a new message.
  */
 export declare const ClientConfigResponseSchema: GenMessage<ClientConfigResponse>;
+
+/**
+ * @generated from message federix.v1.PrepareUpdateRequest
+ */
+export declare type PrepareUpdateRequest = Message<"federix.v1.PrepareUpdateRequest"> & {
+  /**
+   * @generated from field: string round_id = 1;
+   */
+  roundId: string;
+
+  /**
+   * @generated from field: double local_loss_before = 2;
+   */
+  localLossBefore: number;
+
+  /**
+   * @generated from field: double local_loss_after = 3;
+   */
+  localLossAfter: number;
+
+  /**
+   * @generated from field: federix.v1.LabelDistribution label_distribution = 4;
+   */
+  labelDistribution?: LabelDistribution | undefined;
+
+  /**
+   * @generated from field: int32 data_size = 5;
+   */
+  dataSize: number;
+
+  /**
+   * @generated from field: int32 training_time_ms = 6;
+   */
+  trainingTimeMs: number;
+};
+
+/**
+ * Describes the message federix.v1.PrepareUpdateRequest.
+ * Use `create(PrepareUpdateRequestSchema)` to create a new message.
+ */
+export declare const PrepareUpdateRequestSchema: GenMessage<PrepareUpdateRequest>;
+
+/**
+ * @generated from message federix.v1.PrepareUpdateResponse
+ */
+export declare type PrepareUpdateResponse = Message<"federix.v1.PrepareUpdateResponse"> & {
+  /**
+   * @generated from field: string update_id = 1;
+   */
+  updateId: string;
+
+  /**
+   * @generated from field: bool accepted = 2;
+   */
+  accepted: boolean;
+
+  /**
+   * @generated from field: double utility_score = 3;
+   */
+  utilityScore: number;
+
+  /**
+   * @generated from field: federix.v1.CompressionLevel compression_level = 4;
+   */
+  compressionLevel: CompressionLevel;
+
+  /**
+   * @generated from field: double compression_ratio = 5;
+   */
+  compressionRatio: number;
+
+  /**
+   * @generated from field: federix.v1.SignedUrl upload = 6;
+   */
+  upload?: SignedUrl | undefined;
+
+  /**
+   * @generated from field: string reason = 7;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message federix.v1.PrepareUpdateResponse.
+ * Use `create(PrepareUpdateResponseSchema)` to create a new message.
+ */
+export declare const PrepareUpdateResponseSchema: GenMessage<PrepareUpdateResponse>;
 
 /**
  * @generated from service federix.v1.ClientService
@@ -541,6 +643,14 @@ export declare const ClientService: GenService<{
     methodKind: "unary";
     input: typeof EmptySchema;
     output: typeof ClientConfigResponseSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.ClientService.PrepareUpdate
+   */
+  prepareUpdate: {
+    methodKind: "unary";
+    input: typeof PrepareUpdateRequestSchema;
+    output: typeof PrepareUpdateResponseSchema;
   },
 }>;
 

@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { CompressionLevel, EmptySchema, Role, RoundStatus, UpdateStatus } from "./common_pb.js";
+import type { CompressionLevel, EmptySchema, FlServerState, Role, RoundStatus, UpdateStatus, UtilityConfig, UtilityConfigUpdate } from "./common_pb.js";
 
 /**
  * Describes the file admin.proto.
@@ -762,6 +762,11 @@ export declare type CommunicationPoint = Message<"federix.v1.CommunicationPoint"
    * @generated from field: int32 skipped_count = 6;
    */
   skippedCount: number;
+
+  /**
+   * @generated from field: int64 bytes_measured = 7;
+   */
+  bytesMeasured: bigint;
 };
 
 /**
@@ -839,6 +844,21 @@ export declare type ConfigResponse = Message<"federix.v1.ConfigResponse"> & {
    * @generated from field: int32 max_clients_per_round = 7;
    */
   maxClientsPerRound: number;
+
+  /**
+   * @generated from field: int32 local_epochs = 8;
+   */
+  localEpochs: number;
+
+  /**
+   * @generated from field: int32 batch_size = 9;
+   */
+  batchSize: number;
+
+  /**
+   * @generated from field: federix.v1.UtilityConfig utility = 10;
+   */
+  utility?: UtilityConfig | undefined;
 };
 
 /**
@@ -895,6 +915,11 @@ export declare type UpdateConfigRequest = Message<"federix.v1.UpdateConfigReques
    * @generated from field: optional int32 batch_size = 9;
    */
   batchSize?: number | undefined;
+
+  /**
+   * @generated from field: federix.v1.UtilityConfigUpdate utility = 10;
+   */
+  utility?: UtilityConfigUpdate | undefined;
 };
 
 /**
@@ -988,6 +1013,16 @@ export declare type ModelEntry = Message<"federix.v1.ModelEntry"> & {
    * @generated from field: string created_at = 6;
    */
   createdAt: string;
+
+  /**
+   * @generated from field: string sha256 = 7;
+   */
+  sha256: string;
+
+  /**
+   * @generated from field: string format = 8;
+   */
+  format: string;
 };
 
 /**
@@ -1247,6 +1282,57 @@ export declare type DeleteUserResponse = Message<"federix.v1.DeleteUserResponse"
 export declare const DeleteUserResponseSchema: GenMessage<DeleteUserResponse>;
 
 /**
+ * @generated from message federix.v1.FlServerStatusResponse
+ */
+export declare type FlServerStatusResponse = Message<"federix.v1.FlServerStatusResponse"> & {
+  /**
+   * @generated from field: bool online = 1;
+   */
+  online: boolean;
+
+  /**
+   * @generated from field: federix.v1.FlServerState state = 2;
+   */
+  state: FlServerState;
+
+  /**
+   * @generated from field: string worker_id = 3;
+   */
+  workerId: string;
+
+  /**
+   * @generated from field: string current_round_id = 4;
+   */
+  currentRoundId: string;
+
+  /**
+   * @generated from field: string version = 5;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string message = 6;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string last_error = 7;
+   */
+  lastError: string;
+
+  /**
+   * @generated from field: string last_report_at = 8;
+   */
+  lastReportAt: string;
+};
+
+/**
+ * Describes the message federix.v1.FlServerStatusResponse.
+ * Use `create(FlServerStatusResponseSchema)` to create a new message.
+ */
+export declare const FlServerStatusResponseSchema: GenMessage<FlServerStatusResponse>;
+
+/**
  * @generated from service federix.v1.AdminService
  */
 export declare const AdminService: GenService<{
@@ -1461,6 +1547,14 @@ export declare const AdminService: GenService<{
     methodKind: "unary";
     input: typeof UserIdRequestSchema;
     output: typeof DeleteUserResponseSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.AdminService.GetFlServerStatus
+   */
+  getFlServerStatus: {
+    methodKind: "unary";
+    input: typeof EmptySchema;
+    output: typeof FlServerStatusResponseSchema;
   },
 }>;
 

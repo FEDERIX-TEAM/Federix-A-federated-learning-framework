@@ -6,6 +6,7 @@
   "main": "src/index.js",
   "scripts": {
     "generate": "buf generate",
+    "proto:breaking": "buf breaking proto --against '../.git#branch=main,subdir=backend/proto'",
     "check:services": "node scripts/check-services.js",
     "prestart": "npm run check:services",
     "start": "node src/index.js",

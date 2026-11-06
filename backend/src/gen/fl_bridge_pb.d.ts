@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { CompressionLevel, EmptySchema, LabelDistribution } from "./common_pb.js";
+import type { CompressionLevel, EmptySchema, FlServerState, LabelDistribution, RoundReadyReason, SignedUrl, UtilityConfig } from "./common_pb.js";
 
 /**
  * Describes the file fl_bridge.proto.
@@ -102,6 +102,11 @@ export declare type CompleteRoundRequest = Message<"federix.v1.CompleteRoundRequ
    * @generated from field: double global_accuracy = 5;
    */
   globalAccuracy: number;
+
+  /**
+   * @generated from field: repeated string used_update_ids = 6;
+   */
+  usedUpdateIds: string[];
 };
 
 /**
@@ -346,6 +351,26 @@ export declare type FlConfigResponse = Message<"federix.v1.FlConfigResponse"> & 
    * @generated from field: int32 min_clients = 5;
    */
   minClients: number;
+
+  /**
+   * @generated from field: int32 local_epochs = 6;
+   */
+  localEpochs: number;
+
+  /**
+   * @generated from field: int32 batch_size = 7;
+   */
+  batchSize: number;
+
+  /**
+   * @generated from field: federix.v1.UtilityConfig utility = 8;
+   */
+  utility?: UtilityConfig | undefined;
+
+  /**
+   * @generated from field: int32 max_clients = 9;
+   */
+  maxClients: number;
 };
 
 /**
@@ -353,6 +378,162 @@ export declare type FlConfigResponse = Message<"federix.v1.FlConfigResponse"> & 
  * Use `create(FlConfigResponseSchema)` to create a new message.
  */
 export declare const FlConfigResponseSchema: GenMessage<FlConfigResponse>;
+
+/**
+ * @generated from message federix.v1.WatchRoundsRequest
+ */
+export declare type WatchRoundsRequest = Message<"federix.v1.WatchRoundsRequest"> & {
+  /**
+   * @generated from field: string worker_id = 1;
+   */
+  workerId: string;
+};
+
+/**
+ * Describes the message federix.v1.WatchRoundsRequest.
+ * Use `create(WatchRoundsRequestSchema)` to create a new message.
+ */
+export declare const WatchRoundsRequestSchema: GenMessage<WatchRoundsRequest>;
+
+/**
+ * @generated from message federix.v1.RoundReadyEvent
+ */
+export declare type RoundReadyEvent = Message<"federix.v1.RoundReadyEvent"> & {
+  /**
+   * @generated from field: string round_id = 1;
+   */
+  roundId: string;
+
+  /**
+   * @generated from field: int32 round_number = 2;
+   */
+  roundNumber: number;
+
+  /**
+   * @generated from field: federix.v1.RoundReadyReason reason = 3;
+   */
+  reason: RoundReadyReason;
+
+  /**
+   * @generated from field: int32 update_count = 4;
+   */
+  updateCount: number;
+
+  /**
+   * @generated from field: int32 model_version_before = 5;
+   */
+  modelVersionBefore: number;
+
+  /**
+   * @generated from field: string ready_at = 6;
+   */
+  readyAt: string;
+};
+
+/**
+ * Describes the message federix.v1.RoundReadyEvent.
+ * Use `create(RoundReadyEventSchema)` to create a new message.
+ */
+export declare const RoundReadyEventSchema: GenMessage<RoundReadyEvent>;
+
+/**
+ * @generated from message federix.v1.ModelUploadUrlRequest
+ */
+export declare type ModelUploadUrlRequest = Message<"federix.v1.ModelUploadUrlRequest"> & {
+  /**
+   * @generated from field: int32 model_version = 1;
+   */
+  modelVersion: number;
+};
+
+/**
+ * Describes the message federix.v1.ModelUploadUrlRequest.
+ * Use `create(ModelUploadUrlRequestSchema)` to create a new message.
+ */
+export declare const ModelUploadUrlRequestSchema: GenMessage<ModelUploadUrlRequest>;
+
+/**
+ * @generated from message federix.v1.ModelUploadUrlResponse
+ */
+export declare type ModelUploadUrlResponse = Message<"federix.v1.ModelUploadUrlResponse"> & {
+  /**
+   * @generated from field: federix.v1.SignedUrl upload = 1;
+   */
+  upload?: SignedUrl | undefined;
+
+  /**
+   * @generated from field: string resource_path = 2;
+   */
+  resourcePath: string;
+};
+
+/**
+ * Describes the message federix.v1.ModelUploadUrlResponse.
+ * Use `create(ModelUploadUrlResponseSchema)` to create a new message.
+ */
+export declare const ModelUploadUrlResponseSchema: GenMessage<ModelUploadUrlResponse>;
+
+/**
+ * @generated from message federix.v1.FlStatusReport
+ */
+export declare type FlStatusReport = Message<"federix.v1.FlStatusReport"> & {
+  /**
+   * @generated from field: string worker_id = 1;
+   */
+  workerId: string;
+
+  /**
+   * @generated from field: federix.v1.FlServerState state = 2;
+   */
+  state: FlServerState;
+
+  /**
+   * @generated from field: string current_round_id = 3;
+   */
+  currentRoundId: string;
+
+  /**
+   * @generated from field: string version = 4;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string message = 5;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string last_error = 6;
+   */
+  lastError: string;
+};
+
+/**
+ * Describes the message federix.v1.FlStatusReport.
+ * Use `create(FlStatusReportSchema)` to create a new message.
+ */
+export declare const FlStatusReportSchema: GenMessage<FlStatusReport>;
+
+/**
+ * @generated from message federix.v1.FlStatusReportAck
+ */
+export declare type FlStatusReportAck = Message<"federix.v1.FlStatusReportAck"> & {
+  /**
+   * @generated from field: bool accepted = 1;
+   */
+  accepted: boolean;
+
+  /**
+   * @generated from field: string server_time = 2;
+   */
+  serverTime: string;
+};
+
+/**
+ * Describes the message federix.v1.FlStatusReportAck.
+ * Use `create(FlStatusReportAckSchema)` to create a new message.
+ */
+export declare const FlStatusReportAckSchema: GenMessage<FlStatusReportAck>;
 
 /**
  * @generated from service federix.v1.FlBridgeService
@@ -413,6 +594,30 @@ export declare const FlBridgeService: GenService<{
     methodKind: "unary";
     input: typeof EmptySchema;
     output: typeof FlConfigResponseSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.FlBridgeService.WatchRounds
+   */
+  watchRounds: {
+    methodKind: "server_streaming";
+    input: typeof WatchRoundsRequestSchema;
+    output: typeof RoundReadyEventSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.FlBridgeService.GetModelUploadUrl
+   */
+  getModelUploadUrl: {
+    methodKind: "unary";
+    input: typeof ModelUploadUrlRequestSchema;
+    output: typeof ModelUploadUrlResponseSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.FlBridgeService.ReportFlStatus
+   */
+  reportFlStatus: {
+    methodKind: "unary";
+    input: typeof FlStatusReportSchema;
+    output: typeof FlStatusReportAckSchema;
   },
 }>;
 

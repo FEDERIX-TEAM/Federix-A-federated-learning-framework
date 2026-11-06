@@ -77,6 +77,159 @@ export declare type StatusResponse = Message<"federix.v1.StatusResponse"> & {
 export declare const StatusResponseSchema: GenMessage<StatusResponse>;
 
 /**
+ * @generated from message federix.v1.SignedUrl
+ */
+export declare type SignedUrl = Message<"federix.v1.SignedUrl"> & {
+  /**
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * @generated from field: string expires_at = 2;
+   */
+  expiresAt: string;
+
+  /**
+   * @generated from field: string refresh_until = 3;
+   */
+  refreshUntil: string;
+
+  /**
+   * @generated from field: int64 max_bytes = 4;
+   */
+  maxBytes: bigint;
+};
+
+/**
+ * Describes the message federix.v1.SignedUrl.
+ * Use `create(SignedUrlSchema)` to create a new message.
+ */
+export declare const SignedUrlSchema: GenMessage<SignedUrl>;
+
+/**
+ * @generated from message federix.v1.UtilityConfig
+ */
+export declare type UtilityConfig = Message<"federix.v1.UtilityConfig"> & {
+  /**
+   * @generated from field: double weight_quality = 1;
+   */
+  weightQuality: number;
+
+  /**
+   * @generated from field: double weight_size = 2;
+   */
+  weightSize: number;
+
+  /**
+   * @generated from field: double weight_diversity = 3;
+   */
+  weightDiversity: number;
+
+  /**
+   * @generated from field: double size_saturation = 4;
+   */
+  sizeSaturation: number;
+
+  /**
+   * @generated from field: int32 num_classes = 5;
+   */
+  numClasses: number;
+
+  /**
+   * @generated from field: double temperature = 6;
+   */
+  temperature: number;
+
+  /**
+   * @generated from field: double threshold_high = 7;
+   */
+  thresholdHigh: number;
+
+  /**
+   * @generated from field: double threshold_low = 8;
+   */
+  thresholdLow: number;
+
+  /**
+   * @generated from field: double ratio_high = 9;
+   */
+  ratioHigh: number;
+
+  /**
+   * @generated from field: double ratio_medium = 10;
+   */
+  ratioMedium: number;
+
+  /**
+   * @generated from field: double ratio_low = 11;
+   */
+  ratioLow: number;
+};
+
+/**
+ * Describes the message federix.v1.UtilityConfig.
+ * Use `create(UtilityConfigSchema)` to create a new message.
+ */
+export declare const UtilityConfigSchema: GenMessage<UtilityConfig>;
+
+/**
+ * @generated from message federix.v1.UtilityConfigUpdate
+ */
+export declare type UtilityConfigUpdate = Message<"federix.v1.UtilityConfigUpdate"> & {
+  /**
+   * @generated from field: optional double weight_quality = 1;
+   */
+  weightQuality?: number | undefined;
+
+  /**
+   * @generated from field: optional double weight_size = 2;
+   */
+  weightSize?: number | undefined;
+
+  /**
+   * @generated from field: optional double weight_diversity = 3;
+   */
+  weightDiversity?: number | undefined;
+
+  /**
+   * @generated from field: optional double size_saturation = 4;
+   */
+  sizeSaturation?: number | undefined;
+
+  /**
+   * @generated from field: optional int32 num_classes = 5;
+   */
+  numClasses?: number | undefined;
+
+  /**
+   * @generated from field: optional double temperature = 6;
+   */
+  temperature?: number | undefined;
+
+  /**
+   * @generated from field: optional double ratio_high = 7;
+   */
+  ratioHigh?: number | undefined;
+
+  /**
+   * @generated from field: optional double ratio_medium = 8;
+   */
+  ratioMedium?: number | undefined;
+
+  /**
+   * @generated from field: optional double ratio_low = 9;
+   */
+  ratioLow?: number | undefined;
+};
+
+/**
+ * Describes the message federix.v1.UtilityConfigUpdate.
+ * Use `create(UtilityConfigUpdateSchema)` to create a new message.
+ */
+export declare const UtilityConfigUpdateSchema: GenMessage<UtilityConfigUpdate>;
+
+/**
  * Roles recognized across the platform (design.md §4 RBAC matrix).
  *
  * @generated from enum federix.v1.Role
@@ -227,4 +380,79 @@ export enum CompressionLevel {
  * Describes the enum federix.v1.CompressionLevel.
  */
 export declare const CompressionLevelSchema: GenEnum<CompressionLevel>;
+
+/**
+ * @generated from enum federix.v1.RoundReadyReason
+ */
+export enum RoundReadyReason {
+  /**
+   * @generated from enum value: ROUND_READY_REASON_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ROUND_READY_REASON_DEADLINE = 1;
+   */
+  DEADLINE = 1,
+
+  /**
+   * @generated from enum value: ROUND_READY_REASON_ALL_SUBMITTED = 2;
+   */
+  ALL_SUBMITTED = 2,
+
+  /**
+   * @generated from enum value: ROUND_READY_REASON_MAX_UPDATES = 3;
+   */
+  MAX_UPDATES = 3,
+
+  /**
+   * @generated from enum value: ROUND_READY_REASON_KEEPALIVE = 4;
+   */
+  KEEPALIVE = 4,
+
+  /**
+   * @generated from enum value: ROUND_READY_REASON_RESUMED = 5;
+   */
+  RESUMED = 5,
+}
+
+/**
+ * Describes the enum federix.v1.RoundReadyReason.
+ */
+export declare const RoundReadyReasonSchema: GenEnum<RoundReadyReason>;
+
+/**
+ * @generated from enum federix.v1.FlServerState
+ */
+export enum FlServerState {
+  /**
+   * @generated from enum value: FL_SERVER_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: FL_SERVER_STATE_STARTING = 1;
+   */
+  STARTING = 1,
+
+  /**
+   * @generated from enum value: FL_SERVER_STATE_IDLE = 2;
+   */
+  IDLE = 2,
+
+  /**
+   * @generated from enum value: FL_SERVER_STATE_AGGREGATING = 3;
+   */
+  AGGREGATING = 3,
+
+  /**
+   * @generated from enum value: FL_SERVER_STATE_ERROR = 4;
+   */
+  ERROR = 4,
+}
+
+/**
+ * Describes the enum federix.v1.FlServerState.
+ */
+export declare const FlServerStateSchema: GenEnum<FlServerState>;
 

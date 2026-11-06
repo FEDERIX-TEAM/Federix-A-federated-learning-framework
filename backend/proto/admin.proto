@@ -41,6 +41,7 @@ service AdminService {
   rpc ListUsers(Empty) returns (stream AdminUserEntry);
   rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse);
   rpc DeleteUser(UserIdRequest) returns (DeleteUserResponse);
+  rpc GetFlServerStatus(Empty) returns (FlServerStatusResponse);
 }
 
 // ---- Clients ----
@@ -220,6 +221,7 @@ message CommunicationPoint {
   int32 full_count = 4;
   int32 compressed_count = 5;
   int32 skipped_count = 6;
+  int64 bytes_measured = 7;
 }
 
 message FairnessPoint {
@@ -239,6 +241,9 @@ message ConfigResponse {
   double utility_threshold_low = 5;
   double compression_ratio = 6;
   int32 max_clients_per_round = 7;
+  int32 local_epochs = 8;
+  int32 batch_size = 9;
+  UtilityConfig utility = 10;
 }
 
 message UpdateConfigRequest {
@@ -251,6 +256,7 @@ message UpdateConfigRequest {
   optional double compression_ratio = 7;
   optional int32 local_epochs = 8;
   optional int32 batch_size = 9;
+  UtilityConfigUpdate utility = 10;
 }
 
 message UpdateConfigResponse {
@@ -274,6 +280,8 @@ message ModelEntry {
   double accuracy = 4;
   int64 size_bytes = 5;
   string created_at = 6;
+  string sha256 = 7;
+  string format = 8;
 }
 
 message ModelIdRequest {
@@ -334,4 +342,15 @@ message UserIdRequest {
 
 message DeleteUserResponse {
   bool deleted = 1;
+}
+
+message FlServerStatusResponse {
+  bool online = 1;
+  FlServerState state = 2;
+  string worker_id = 3;
+  string current_round_id = 4;
+  string version = 5;
+  string message = 6;
+  string last_error = 7;
+  string last_report_at = 8;
 }
