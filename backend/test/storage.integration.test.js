@@ -178,6 +178,7 @@ test('deleting a model also deletes its stored file', async () => {
   const oldVersion = 1 + Math.floor(Math.random() * 1e9);
   await put(uploadUrl(`/models/${oldVersion}`), Buffer.from('old model'));
   await srv.api.fl.pushModel({ modelVersion: oldVersion, weightsUrl: `/models/${oldVersion}` }, srv.internal);
+  await put(uploadUrl(`/models/${oldVersion + 1}`), Buffer.from('newer model'));
   await srv.api.fl.pushModel({ modelVersion: oldVersion + 1, weightsUrl: `/models/${oldVersion + 1}` }, srv.internal);
 
   const models = await collect(srv.api.admin.listModels({}, srv.superAdmin));

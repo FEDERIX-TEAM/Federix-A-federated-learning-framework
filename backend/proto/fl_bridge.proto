@@ -57,6 +57,11 @@ message RoundUpdateEntry {
   string download_url = 3;
   double utility_score = 4;
   LabelDistribution label_distribution = 5;
+  string sha256 = 6;
+  int64 bytes = 7;
+  double compression_ratio = 8;
+  int32 data_size = 9;
+  CompressionLevel compression_level = 10;
 }
 
 message PushModelRequest {

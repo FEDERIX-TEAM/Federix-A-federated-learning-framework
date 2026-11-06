@@ -20,9 +20,15 @@ const distinctNonZero = (map) => {
 };
 
 test('every enum mapping uses distinct non-zero proto values', () => {
-  for (const map of [ROLE_TO_PROTO, ROUND_STATUS_TO_PROTO, UPDATE_STATUS_TO_PROTO, COMPRESSION_LEVEL_TO_PROTO]) {
+  for (const map of [ROLE_TO_PROTO, ROUND_STATUS_TO_PROTO, COMPRESSION_LEVEL_TO_PROTO]) {
     assert.ok(distinctNonZero(map));
   }
+  const { prepared, ...updateStatuses } = UPDATE_STATUS_TO_PROTO;
+  assert.ok(distinctNonZero(updateStatuses));
+});
+
+test('a prepared update is reported to clients as pending', () => {
+  assert.equal(UPDATE_STATUS_TO_PROTO.prepared, UPDATE_STATUS_TO_PROTO.pending);
 });
 
 test('roles map to proto and back', () => {

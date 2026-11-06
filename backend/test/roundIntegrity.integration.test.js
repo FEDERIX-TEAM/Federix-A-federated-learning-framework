@@ -34,18 +34,13 @@ async function stopRound(roundId) {
   await srv.api.admin.stopRound({ roundId, reason: 'test cleanup' }, srv.superAdmin).catch(() => {});
 }
 
-const join = (roundId, c) => srv.api.client.joinRound({ roundId, localDataSize: 500 }, c);
+const join = (roundId, c) => srv.api.client.joinRound({ roundId, localDataSize: 100000 }, c);
 
-function submit(roundId, c, before, after, dataSize, counts) {
-  return srv.api.client.submitUpdate({
-    roundId,
-    deltaWeightsUrl: `s3://bucket/${c.id}.bin`,
-    localLossBefore: before,
-    localLossAfter: after,
-    labelDistribution: { counts },
-    dataSize,
-    trainingTimeMs: 1000,
-  }, c);
+async function submit(roundId, c, before, after, dataSize, counts) {
+  const { submitted } = await srv.submitUpdate(c, {
+    roundId, localLossBefore: before, localLossAfter: after, labelDistribution: counts, dataSize, trainingTimeMs: 1000,
+  });
+  return submitted;
 }
 
 const submitGood = (roundId, c) => submit(roundId, c, 1.0, 0.2, 5000, { a: 100, b: 100, c: 100 });
@@ -197,15 +192,7 @@ test('rounds_participated counts once per completed round, only for usable updat
     assert.equal((await srv.api.client.getStatus({}, c)).roundCount, 0);
   }
 
-  const ups = await collect(srv.api.fl.getRoundUpdates({ roundId: round.roundId }, srv.internal));
-  await srv.api.fl.triggerRound({ roundId: round.roundId, updateIds: ups.map((u) => u.updateId) }, srv.internal);
-  await srv.api.fl.completeRound({
-    roundId: round.roundId,
-    newModelVersion: 1 + Math.floor(Math.random() * 1e9),
-    modelUrl: 's3://models/test.bin',
-    globalLoss: 0.4,
-    globalAccuracy: 0.9,
-  }, srv.internal);
+  await srv.completeRound(round.roundId);
 
   const counts = {};
   for (const [name, c] of Object.entries({ contributor, rejoiner, rejected, idle })) {

@@ -6,7 +6,7 @@ const updateSchema = new mongoose.Schema(
     round_id: { type: String, required: true, index: true },
     client_id: { type: String, required: true, index: true },
 
-    delta_weights_url: { type: String, required: true },
+    delta_weights_url: { type: String, default: null },
     local_loss_before: { type: Number, required: true },
     local_loss_after: { type: Number, required: true },
     label_distribution: { type: mongoose.Schema.Types.Mixed, default: {} },
@@ -15,7 +15,7 @@ const updateSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['pending', 'accepted', 'compressed', 'rejected'],
+      enum: ['pending', 'prepared', 'accepted', 'compressed', 'rejected'],
       default: 'pending',
       index: true,
     },
@@ -25,7 +25,15 @@ const updateSchema = new mongoose.Schema(
     compression_required: { type: Boolean, default: false },
     reason: { type: String, default: null },
 
-    submitted_at: { type: Date, default: Date.now },
+    planned_status: { type: String, enum: ['accepted', 'compressed', null], default: null },
+    compression_ratio: { type: Number, default: null },
+    upload_path: { type: String, default: null },
+    max_bytes: { type: Number, default: null },
+    bytes_uploaded: { type: Number, default: null },
+    sha256: { type: String, default: null },
+    prepared_at: { type: Date, default: null },
+    uploaded_at: { type: Date, default: null },
+    submitted_at: { type: Date, default: null },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );

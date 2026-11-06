@@ -22,6 +22,7 @@ export const ROUND_STATUS_TO_PROTO = {
 
 export const UPDATE_STATUS_TO_PROTO = {
   pending: 1,
+  prepared: 1,
   accepted: 2,
   compressed: 3,
   rejected: 4,

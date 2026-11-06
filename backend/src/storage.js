@@ -242,7 +242,13 @@ export function createStorage(rootDir = config.storage.dir) {
     return removed;
   }
 
-  return { root, fileFor, stat, remove, write, writeChunk, uploadStatus, sweep };
+  async function digest(resourcePath) {
+    const found = await stat(resourcePath);
+    if (!found) return null;
+    return { bytes: found.bytes, sha256: await sha256Of(found.file) };
+  }
+
+  return { root, fileFor, stat, digest, remove, write, writeChunk, uploadStatus, sweep };
 }
 
 export const storage = createStorage();

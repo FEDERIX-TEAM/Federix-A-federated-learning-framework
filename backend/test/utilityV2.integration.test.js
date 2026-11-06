@@ -54,16 +54,15 @@ async function runOneUpdate(input) {
   const c = await srv.newSdkClient('utility');
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
-    await srv.api.client.joinRound({ roundId: round.roundId }, c);
-    const res = await srv.api.client.submitUpdate({
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: input.dataSize }, c);
+    const { submitted: res } = await srv.submitUpdate(c, {
       roundId: round.roundId,
-      deltaWeightsUrl: 's3://u.bin',
       localLossBefore: input.localLossBefore,
       localLossAfter: input.localLossAfter,
-      labelDistribution: { counts: input.labelDistribution },
+      labelDistribution: input.labelDistribution,
       dataSize: input.dataSize,
       trainingTimeMs: 10,
-    }, c);
+    });
     const stored = await Update.findOne({ update_id: res.updateId }).lean();
     return { res, stored, round, client: c };
   } finally {
@@ -114,11 +113,11 @@ test('by default a poor update is compressed hard, not rejected, and reaches the
   const c = await srv.newSdkClient('poor');
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
-    await srv.api.client.joinRound({ roundId: round.roundId }, c);
-    const res = await srv.api.client.submitUpdate({
-      roundId: round.roundId, deltaWeightsUrl: 's3://u.bin', localLossBefore: 1, localLossAfter: 1,
-      labelDistribution: { counts: { a: 1 } }, dataSize: 1, trainingTimeMs: 1,
-    }, c);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 1000 }, c);
+    const { submitted: res } = await srv.submitUpdate(c, {
+      roundId: round.roundId, localLossBefore: 1, localLossAfter: 1,
+      labelDistribution: { a: 1 }, dataSize: 1, trainingTimeMs: 1,
+    });
     assert.equal(res.accepted, true);
     assert.equal(res.compressionRequired, true);
     const status = await srv.api.client.getUpdateStatus({ roundId: round.roundId }, c);
@@ -202,13 +201,13 @@ test('a running round keeps its utility settings when they change mid-round', as
   const c = await srv.newSdkClient('snapshot');
   const round = await srv.api.admin.startRound({ maxClients: 5, deadlineSeconds: 600 }, srv.superAdmin);
   try {
-    await srv.api.client.joinRound({ roundId: round.roundId }, c);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 1000 }, c);
     await srv.api.admin.updateConfig({ utility: { weightQuality: 1, weightDiversity: 0 } }, srv.superAdmin);
 
-    const res = await srv.api.client.submitUpdate({
-      roundId: round.roundId, deltaWeightsUrl: 's3://u.bin', localLossBefore: 1, localLossAfter: 0,
-      labelDistribution: { counts: { 0: 1 } }, dataSize: 10, trainingTimeMs: 1,
-    }, c);
+    const { submitted: res } = await srv.submitUpdate(c, {
+      roundId: round.roundId, localLossBefore: 1, localLossAfter: 0,
+      labelDistribution: { 0: 1 }, dataSize: 10, trainingTimeMs: 1,
+    });
     assert.equal((await Update.findOne({ update_id: res.updateId }).lean()).utility_score, 0);
 
     const fl = await srv.api.fl.getFlConfig({}, srv.internal);
@@ -229,11 +228,11 @@ test('rounds whose snapshot predates utility v2 fall back to the live utility se
     const legacy = {};
     for (const k of Object.keys(UTILITY_KEYS)) legacy[`config_snapshot.${k}`] = 1;
     await Round.updateOne({ round_id: round.roundId }, { $unset: legacy });
-    await srv.api.client.joinRound({ roundId: round.roundId }, c);
-    const res = await srv.api.client.submitUpdate({
-      roundId: round.roundId, deltaWeightsUrl: 's3://u.bin', localLossBefore: 2, localLossAfter: 1,
-      labelDistribution: { counts: { 0: 1 } }, dataSize: 10, trainingTimeMs: 1,
-    }, c);
+    await srv.api.client.joinRound({ roundId: round.roundId, localDataSize: 1000 }, c);
+    const { submitted: res } = await srv.submitUpdate(c, {
+      roundId: round.roundId, localLossBefore: 2, localLossAfter: 1,
+      labelDistribution: { 0: 1 }, dataSize: 10, trainingTimeMs: 1,
+    });
     const score = (await Update.findOne({ update_id: res.updateId }).lean()).utility_score;
     assert.ok(Math.abs(score - (1 / (2 + 1e-8))) < 1e-12, String(score));
   } finally {

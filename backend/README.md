@@ -8,7 +8,7 @@ dashboard API, and a live event stream.
 Connect**) · MongoDB + Mongoose · Redis (token blacklist + maintenance flag; auto-falls back to an
 in-memory stub in dev) · JWT · bcrypt.
 
-6 services / 62 RPCs are defined in `proto/`. 57 are implemented; the 5 added in protocol v1.1 (`PrepareUpdate`, `WatchRounds`, `GetModelUploadUrl`, `ReportFlStatus`, `GetFlServerStatus`) answer `Unimplemented` until their features land.
+6 services / 62 RPCs are defined in `proto/`. 59 are implemented; `WatchRounds`, `ReportFlStatus` and `GetFlServerStatus` answer `Unimplemented` until the round scheduler lands.
 
 ## Quick start
 
@@ -267,11 +267,23 @@ A `connected` event arrives first and a `ping` every 30s as keep-alive.
 
 ## Round lifecycle
 
-`StartRound` (admin) → status `active`, clients `JoinRound`, train, `SubmitUpdate` (server computes a
-utility score → `accepted` / `compressed` / `rejected` using the config thresholds) → FL server calls
-`TriggerRound` (→ `aggregating`) and pulls updates with `GetRoundUpdates` → `CompleteRound` (→ `complete`,
-new active model stored). `StopRound` aborts. Config changes apply from the *next* round (each round
-snapshots the config at start). Participants who miss 3 heartbeats (90s) are marked `dropped`.
+1. `StartRound` (admin) → round `active`.
+2. Client `JoinRound` with `local_data_size` (required; it caps the `data_size` the client may report later),
+   downloads the model, trains.
+3. Client `PrepareUpdate` with its metrics → the server scores the update with the round's config and returns the
+   tier, the compression ratio to apply and a signed, resumable upload URL (or `accepted=false` with a reason).
+   Update status: `prepared`.
+4. Client compresses to that ratio and uploads the file; storage records its size and sha256.
+5. Client `SubmitUpdate(update_id, sha256)` → checked against the stored upload → `accepted` or `compressed`.
+   Retrying with the same sha256 is safe.
+6. FL server `TriggerRound` (→ `aggregating`), `GetRoundUpdates` (download URL, sha256, bytes, `data_size`,
+   ratio), aggregates, uploads the model with `GetModelUploadUrl`, then `CompleteRound` with
+   `used_update_ids` (→ `complete`). The model must be at `/models/<version>`; its size and sha256 are recorded,
+   unused updates are marked rejected and only contributors get participation credit.
+
+`StopRound` aborts and rejects every open update. `PushModel` registers a model outside a round (e.g. the initial
+model) and is refused while a round runs. Config changes apply from the *next* round. Participants silent for
+`HEARTBEAT_TIMEOUT_MS` are marked `dropped`.
 
 ## Layout
 
@@ -295,7 +307,7 @@ that maps them to proto enum numbers. Handlers receive/return plain objects with
 
 ## Known stand-ins / what's left for the rest of the project
 
-- **Object storage is local.** Files live in `STORAGE_DIR` behind signed URLs with resumable uploads and range downloads (see Storage). RPCs that hand out upload URLs arrive with protocol v1.1; for production, swap `utils/signedUrl.js` and `src/storage.js` for S3/GCS presigned URLs.
+- **Object storage is local.** Files live in `STORAGE_DIR` behind signed URLs with resumable uploads and range downloads (see Storage). For production, swap `utils/signedUrl.js` and `src/storage.js` for S3/GCS presigned URLs.
 - **Utility score** (`utils/utilityScore.js`) follows the paper: `u = (a·q + b·s + c·r)/(a+b+c)` with
   `q = clip((L_before − L_after)/(L_before + ε), 0, 1)`, `s = 1 − exp(−n/n₀)` and `r = H(labels)/log₂(num_classes)`.
   Every parameter (weights, `n₀`, `num_classes`, thresholds, tier ratios, `reject_below`, temperature) lives in
@@ -303,7 +315,7 @@ that maps them to proto enum numbers. Handlers receive/return plain objects with
   `ratio_high`, `u ≥ threshold_low` uses `ratio_medium`, otherwise `ratio_low`; updates are rejected on utility
   only when `reject_below > 0`. The losses are still reported by the client; server-side checks come with the
   FL server.
-- **Communication metrics** approximate bytes from `data_size` (no real transport accounting).
+- **Communication metrics** use the bytes measured by storage; `bytes_saved` compares each upload with the size of the round's base model file.
 - **No round-deadline enforcement:** `deadline_at` is stored and returned, and `JoinRound` refuses after it, but nothing auto-aborts/aggregates a round when it passes. Something (the FL server or a timer here) must call `TriggerRound`/`StopRound`.
 - **Events are in-process.** Fine for one instance; for horizontal scaling back `src/lib/events.js` with Redis pub/sub.
 - `FlBridgeService.CompleteRound` always reports `next_round_scheduled: false` (no auto-scheduler).

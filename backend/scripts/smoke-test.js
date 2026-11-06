@@ -7,6 +7,7 @@
  * Env: SERVER_URL (default http://127.0.0.1:4000), INTERNAL_SERVICE_TOKEN (must match the server's).
  * It creates throw-away users/clients/rounds with a random suffix; it does not clean the database.
  */
+import { randomBytes, createHash } from 'node:crypto';
 import { createClient, Code, ConnectError } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-node';
 import { AuthService } from '../src/gen/auth_pb.js';
@@ -34,6 +35,13 @@ const events = createClient(EventStreamService, transport);
 const bearer = (t) => ({ headers: { authorization: `Bearer ${t}` } });
 const internal = { headers: { 'x-internal-service-token': INTERNAL } };
 const collect = async (stream) => { const out = []; for await (const m of stream) out.push(m); return out; };
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+async function uploadModel(version, body = randomBytes(8192)) {
+  const { upload, resourcePath } = await fl.getModelUploadUrl({ modelVersion: version }, internal);
+  const res = await fetch(upload.url, { method: 'PUT', body });
+  if (res.status !== 201) throw new Error(`model upload failed: ${res.status}`);
+  return { resourcePath, sha: sha256(body) };
+}
 
 let passed = 0;
 let failed = 0;
@@ -149,7 +157,7 @@ async function main() {
   check('GetFlConfig mid-round keeps the round snapshot', roundFlCfg.utilityThresholdLow === 0.05 && roundFlCfg.utilityThresholdHigh === 0.5 && roundFlCfg.mu === 0.02);
 
   for (const c of clients) {
-    const j = await client.joinRound({ roundId: start.roundId, localDataSize: 800, deviceInfo: { entries: { os: 'linux' } } }, c);
+    const j = await client.joinRound({ roundId: start.roundId, localDataSize: 10000, deviceInfo: { entries: { os: 'linux' } } }, c);
     check(`JoinRound ${c.id.slice(0, 6)}`, j.accepted === true);
   }
   check('Heartbeat', (await client.heartbeat({ roundId: start.roundId }, clients[0])).ok);
@@ -158,14 +166,22 @@ async function main() {
   const lv = await client.leaveRound({ roundId: start.roundId, reason: 'test' }, clients[2]);
   check('LeaveRound', lv.success && lv.remainingParticipants === 2);
   await expectCode('LeaveRound again -> FailedPrecondition', Code.FailedPrecondition, () => client.leaveRound({ roundId: start.roundId }, clients[2]));
-  const rejoin = await client.joinRound({ roundId: start.roundId, localDataSize: 800 }, clients[2]);
+  const rejoin = await client.joinRound({ roundId: start.roundId, localDataSize: 10000 }, clients[2]);
   check('Re-JoinRound after leaving', rejoin.accepted);
 
   // good, mediocre, and poor updates -> accepted / compressed / rejected
-  const submit = (c, before, after, size, dist) => client.submitUpdate({
-    roundId: start.roundId, deltaWeightsUrl: `s3://bucket/${c.id}.bin`, localLossBefore: before, localLossAfter: after,
-    labelDistribution: { counts: dist }, dataSize: size, trainingTimeMs: 1200,
+  const prepare = (c, before, after, size, dist, trainingTimeMs = 1200) => client.prepareUpdate({
+    roundId: start.roundId, localLossBefore: before, localLossAfter: after,
+    labelDistribution: { counts: dist }, dataSize: size, trainingTimeMs,
   }, c);
+  const submit = async (c, before, after, size, dist) => {
+    const p = await prepare(c, before, after, size, dist);
+    if (!p.accepted) return { updateId: p.updateId, accepted: false, compressionRequired: false };
+    const body = randomBytes(4096);
+    const put = await fetch(p.upload.url, { method: 'PUT', body });
+    if (put.status !== 201) throw new Error(`update upload failed: ${put.status}`);
+    return client.submitUpdate({ roundId: start.roundId, updateId: p.updateId, sha256: sha256(body) }, c);
+  };
   const s0 = await submit(clients[0], 1.0, 0.2, 5000, { a: 100, b: 100, c: 100 });
   const s1 = await submit(clients[1], 1.0, 0.9, 200, { a: 100 });
   const s2 = await submit(clients[2], 1.0, 1.0, 1, { a: 1 });
@@ -174,15 +190,14 @@ async function main() {
   check('SubmitUpdate poor -> rejected', s2.accepted === false);
   const s2Status = await client.getUpdateStatus({ roundId: start.roundId }, clients[2]);
   check('Rejection reason cites the snapshot threshold', s2Status.reason.includes('threshold 0.05'), s2Status.reason);
-  await expectCode('SubmitUpdate NaN loss -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, NaN, 200, { a: 100 }));
-  await expectCode('SubmitUpdate Infinity loss -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], Infinity, 0.5, 200, { a: 100 }));
-  await expectCode('SubmitUpdate Infinity label count -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, 0.5, 200, { a: Infinity, b: 3 }));
-  await expectCode('SubmitUpdate negative label count -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, 0.5, 200, { a: -1 }));
-  await expectCode('SubmitUpdate dotted label key -> InvalidArgument', Code.InvalidArgument, () => submit(clients[1], 1.0, 0.5, 200, { 'a.b': 1 }));
-  await expectCode('SubmitUpdate negative training time -> InvalidArgument', Code.InvalidArgument, () => client.submitUpdate({
-    roundId: start.roundId, deltaWeightsUrl: 's3://bucket/x.bin', localLossBefore: 1, localLossAfter: 0.5,
-    labelDistribution: { counts: { a: 1 } }, dataSize: 10, trainingTimeMs: -1,
-  }, clients[1]));
+  await expectCode('PrepareUpdate NaN loss -> InvalidArgument', Code.InvalidArgument, () => prepare(clients[1], 1.0, NaN, 200, { a: 100 }));
+  await expectCode('PrepareUpdate Infinity loss -> InvalidArgument', Code.InvalidArgument, () => prepare(clients[1], Infinity, 0.5, 200, { a: 100 }));
+  await expectCode('PrepareUpdate Infinity label count -> InvalidArgument', Code.InvalidArgument, () => prepare(clients[1], 1.0, 0.5, 200, { a: Infinity, b: 3 }));
+  await expectCode('PrepareUpdate negative label count -> InvalidArgument', Code.InvalidArgument, () => prepare(clients[1], 1.0, 0.5, 200, { a: -1 }));
+  await expectCode('PrepareUpdate dotted label key -> InvalidArgument', Code.InvalidArgument, () => prepare(clients[1], 1.0, 0.5, 200, { 'a.b': 1 }));
+  await expectCode('PrepareUpdate negative training time -> InvalidArgument', Code.InvalidArgument, () => prepare(clients[1], 1, 0.5, 10, { a: 1 }, -1));
+  await expectCode('PrepareUpdate data_size above the declared size -> InvalidArgument', Code.InvalidArgument, () => prepare(clients[1], 1, 0.5, 10001, { a: 1 }));
+  await expectCode('Old one-shot SubmitUpdate -> InvalidArgument', Code.InvalidArgument, () => client.submitUpdate({ roundId: start.roundId, deltaWeightsUrl: 'http://elsewhere/x' }, clients[1]));
   check('Rejected NaN submit did not overwrite the stored update', (await client.getUpdateStatus({ roundId: start.roundId }, clients[1])).status === UpdateStatus.COMPRESSED);
   const s0b = await submit(clients[0], 1.0, 0.2, 5000, { a: 100, b: 100, c: 100 });
   check('Resubmit keeps update_id', s0b.updateId === s0.updateId);
@@ -222,14 +237,18 @@ async function main() {
   check('TriggerRound', trig.accepted && trig.estimatedDurationMs >= 5000);
   check('Round is aggregating', (await admin.getRoundDetail({ roundId: start.roundId }, SA)).status === RoundStatus.AGGREGATING);
   await expectCode('SubmitUpdate while aggregating -> FailedPrecondition', Code.FailedPrecondition, () => submit(clients[0], 1, 0.5, 100, {}));
-  const done = await fl.completeRound({ roundId: start.roundId, newModelVersion: 1000 + Math.floor(Math.random() * 1e6), modelUrl: 's3://m/v1.bin', globalLoss: 0.42, globalAccuracy: 0.87 }, internal);
+  const roundModelVersion = 1000 + Math.floor(Math.random() * 1e6);
+  await expectCode('CompleteRound without an uploaded model -> FailedPrecondition', Code.FailedPrecondition, () => fl.completeRound({ roundId: start.roundId, newModelVersion: roundModelVersion, modelUrl: `/models/${roundModelVersion}` }, internal));
+  const roundModel = await uploadModel(roundModelVersion);
+  const done = await fl.completeRound({ roundId: start.roundId, newModelVersion: roundModelVersion, modelUrl: roundModel.resourcePath, globalLoss: 0.42, globalAccuracy: 0.87, usedUpdateIds: ups.map((u) => u.updateId) }, internal);
   check('CompleteRound', done.success && !!done.modelId);
   check('CompleteRound credits participation to contributors', (await client.getStatus({}, clients[0])).roundCount === roundCountBefore + 1);
   check('CompleteRound does not credit rejected updates', (await client.getStatus({}, clients[2])).roundCount === 0);
   const pushVersion = 2000000 + Math.floor(Math.random() * 1e6);
-  const push = await fl.pushModel({ modelVersion: pushVersion, weightsUrl: 's3://m/extra.bin', metrics: { globalLoss: 0.4, globalAccuracy: 0.9 } }, internal);
+  const pushed = await uploadModel(pushVersion);
+  const push = await fl.pushModel({ modelVersion: pushVersion, weightsUrl: pushed.resourcePath, metrics: { globalLoss: 0.4, globalAccuracy: 0.9 } }, internal);
   check('PushModel', push.stored && !!push.modelId);
-  await expectCode('PushModel duplicate version -> AlreadyExists', Code.AlreadyExists, () => fl.pushModel({ modelVersion: pushVersion, weightsUrl: 'x' }, internal));
+  await expectCode('PushModel duplicate version -> AlreadyExists', Code.AlreadyExists, () => fl.pushModel({ modelVersion: pushVersion, weightsUrl: pushed.resourcePath }, internal));
 
   section('Models + signed URLs');
   const models = await collect(admin.listModels({}, viewer));
@@ -241,8 +260,8 @@ async function main() {
   check('Client GetModelDownload (active)', cdl.modelVersion === pushVersion);
   const bad = await fetch(dl.downloadUrl.replace(/sig=[0-9a-f]+/, 'sig=deadbeef'));
   check('Tampered signed URL -> 403', bad.status === 403);
-  const missing = await fetch(dl.downloadUrl);
-  check('Valid signed URL, file absent -> 404', missing.status === 404);
+  const fetched = await fetch(dl.downloadUrl);
+  check('Signed model URL downloads the uploaded file', fetched.status === 200 && sha256(Buffer.from(await fetched.arrayBuffer())) === pushed.sha && active.sha256 === pushed.sha);
   await expectCode('DeleteModel active -> FailedPrecondition', Code.FailedPrecondition, () => admin.deleteModel({ modelId: active.modelId }, SA));
   const old = models.find((m) => m.modelVersion !== pushVersion);
   check('DeleteModel inactive', (await admin.deleteModel({ modelId: old.modelId }, SA)).deleted);

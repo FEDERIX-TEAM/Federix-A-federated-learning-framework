@@ -11,10 +11,23 @@ import { COMPRESSION_LEVEL_TO_PROTO, labelDistributionToMessage } from '../../ut
 import { configForRound, configForCurrentRound, num } from '../lib/helpers.js';
 import { invalidArg, notFound, alreadyExists, failedPrecondition, notImplementedYet } from '../lib/errors.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
+import { storage } from '../storage.js';
 
 const START_TIME = Date.now();
 
-/** Deactivate every model, then store `fields` as the new active one. */
+const MB = 1024 * 1024;
+const modelPath = (version) => `/models/${version}`;
+
+async function storedModelFile(version, url) {
+  const expected = modelPath(version);
+  if (url !== expected) {
+    throw invalidArg(`model_url must be ${expected}; upload the file with GetModelUploadUrl first`);
+  }
+  const file = await storage.digest(expected);
+  if (!file) throw failedPrecondition(`The model file ${expected} has not been uploaded`);
+  return file;
+}
+
 async function activateNewModel(fields) {
   if (await GlobalModel.exists({ model_version: fields.model_version })) {
     throw alreadyExists(`Model version ${fields.model_version} already exists`);
@@ -54,8 +67,17 @@ export function createFlBridgeService() {
         throw failedPrecondition(`Round is already ${round.status}`);
       }
 
+      const usable = await Update.find({ round_id: req.roundId, status: { $in: ['accepted', 'compressed'] } }).select('update_id').lean();
+      const usableIds = new Set(usable.map((u) => u.update_id));
+      const used = req.usedUpdateIds ?? [];
+      const unknown = used.filter((id) => !usableIds.has(id));
+      if (unknown.length) throw invalidArg(`used_update_ids contains updates that are not usable in this round: ${unknown.join(', ')}`);
+
+      const file = await storedModelFile(req.newModelVersion, req.modelUrl);
       const model = await activateNewModel({
         model_version: req.newModelVersion,
+        size_bytes: file.bytes,
+        sha256: file.sha256,
         round_id: req.roundId,
         weights_url: req.modelUrl,
         metrics: { global_loss: req.globalLoss, global_accuracy: req.globalAccuracy },
@@ -68,6 +90,12 @@ export function createFlBridgeService() {
       round.completed_at = new Date();
       await round.save();
 
+      if (used.length) {
+        await Update.updateMany(
+          { round_id: req.roundId, status: { $in: ['accepted', 'compressed'] }, update_id: { $nin: used } },
+          { $set: { status: 'rejected', reason: 'not used in aggregation' } }
+        );
+      }
       const contributors = await Update.distinct('client_id', { round_id: req.roundId, status: { $in: ['accepted', 'compressed'] } });
       if (contributors.length) {
         await Client.updateMany({ client_id: { $in: contributors } }, { $inc: { rounds_participated: 1 } });
@@ -91,18 +119,29 @@ export function createFlBridgeService() {
         yield {
           updateId: u.update_id,
           clientId: u.client_id,
-          downloadUrl: signedUrl.sign(`/updates/${u.update_id}`).url,
+          downloadUrl: signedUrl.sign(u.upload_path ?? `/updates/${u.update_id}`).url,
           utilityScore: num(u.utility_score),
           labelDistribution: labelDistributionToMessage(u.label_distribution),
+          sha256: u.sha256 ?? '',
+          bytes: BigInt(u.bytes_uploaded ?? 0),
+          compressionRatio: num(u.compression_ratio),
+          dataSize: u.data_size,
+          compressionLevel: COMPRESSION_LEVEL_TO_PROTO[u.compression_level] ?? 0,
         };
       }
     },
 
     async pushModel(req) {
       if (req.modelVersion <= 0 || !req.weightsUrl) throw invalidArg('model_version (> 0) and weights_url are required');
+      if (await Round.exists({ status: { $in: ['active', 'aggregating'] } })) {
+        throw failedPrecondition('A round is running; the active model can only change through CompleteRound');
+      }
 
+      const file = await storedModelFile(req.modelVersion, req.weightsUrl);
       const model = await activateNewModel({
         model_version: req.modelVersion,
+        size_bytes: file.bytes,
+        sha256: file.sha256,
         round_id: req.roundId ?? null,
         weights_url: req.weightsUrl,
         metrics: {
@@ -151,8 +190,23 @@ export function createFlBridgeService() {
       throw notImplementedYet('FlBridgeService.WatchRounds');
     },
 
-    async getModelUploadUrl() {
-      throw notImplementedYet('FlBridgeService.GetModelUploadUrl');
+    async getModelUploadUrl(req) {
+      if (!Number.isInteger(req.modelVersion) || req.modelVersion <= 0) throw invalidArg('model_version must be > 0');
+      if (await GlobalModel.exists({ model_version: req.modelVersion })) {
+        throw alreadyExists(`Model version ${req.modelVersion} already exists`);
+      }
+      const maxBytes = appConfig.limits.maxModelSizeMb * MB;
+      const resourcePath = modelPath(req.modelVersion);
+      const signed = signedUrl.sign(resourcePath, { method: 'PUT', maxBytes, overwrite: false });
+      return {
+        upload: {
+          url: signed.url,
+          expiresAt: signed.expiresAt.toISOString(),
+          refreshUntil: signed.refreshUntil.toISOString(),
+          maxBytes: BigInt(maxBytes),
+        },
+        resourcePath,
+      };
     },
 
     async reportFlStatus() {
