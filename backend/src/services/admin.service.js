@@ -21,7 +21,7 @@ import {
   FL_SERVER_STATE_TO_PROTO,
   dateToIso,
 } from '../../utils/protoMappers.js';
-import { authOf, getActiveConfig, clampN, parseDate, num, joinedCount, giniCoefficient } from '../lib/helpers.js';
+import { authOf, getActiveConfig, configForRound, clampN, parseDate, num, joinedCount, giniCoefficient } from '../lib/helpers.js';
 import { invalidArg, notFound, failedPrecondition } from '../lib/errors.js';
 import { latestFlStatus } from '../lib/flStatus.js';
 import { requireFinite } from '../lib/validate.js';
@@ -358,11 +358,12 @@ export function createAdminService({ redis }) {
     async *getFairnessMetrics(req) {
       const rounds = await Round.find({ status: 'complete' }).sort({ round_number: -1 }).limit(metricsRounds(req));
       for (const r of rounds.reverse()) {
-        const scores = (await Update.find({ round_id: r.round_id })).map((u) => num(u.utility_score));
-        const joined = joinedCount(r);
+        const scored = (await Update.find({ round_id: r.round_id, utility_score: { $ne: null } }).select('utility_score').lean()).map((u) => u.utility_score);
+        const scores = scored.map(num);
+        const { utility_threshold_low: lowCut } = await configForRound(r);
         yield {
           roundNumber: r.round_number,
-          minorityParticipationRate: joined > 0 ? Number((scores.filter((s) => s < 0.3).length / joined).toFixed(4)) : 0,
+          minorityParticipationRate: scores.length ? Number((scores.filter((s) => s < lowCut).length / scores.length).toFixed(4)) : 0,
           giniCoefficient: giniCoefficient(scores),
           utilityDistribution: scores,
         };

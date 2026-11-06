@@ -8,6 +8,8 @@ import { cors as connectCors } from '@connectrpc/connect';
 import { config, assertValidConfig, assertProductionSecrets } from '../config/index.js';
 import { connectMongo, createRedisClient } from '../db.js';
 import { buildInterceptors } from './interceptors.js';
+import { CLIENT_IP_HEADER } from '../interceptors/rateLimit.interceptor.js';
+import { ensureAuditRetention } from '../models/AuditLog.js';
 import { registerStorageRoute, startStorageSweeper, storage } from './storage.js';
 import { recordStoredObject } from './lib/uploads.js';
 import { startHeartbeatWatcher } from './heartbeatWatcher.js';
@@ -35,7 +37,7 @@ import { createEventService } from './services/events.service.js';
 //   HTTP2=true         HTTP/2 cleartext (h2c) -> native gRPC clients (grpcio, grpc-java, grpcurl -plaintext) work.
 //   TLS_KEY + TLS_CERT HTTP/2 over TLS with HTTP/1.1 fallback (recommended for production).
 function buildServerOptions() {
-  const base = { logger: { level: config.logLevel } };
+  const base = { logger: { level: config.logLevel }, trustProxy: config.server.trustProxy };
   const { tlsKey, tlsCert, http2 } = config.server;
   if (tlsKey && tlsCert) {
     return {
@@ -59,13 +61,19 @@ async function main() {
 
   await getActiveConfig();
   await ensureRoundIndexes();
+  await ensureAuditRetention(config.audit.retentionDays);
 
+  const allowedOrigins = new Set(config.cors.allowedOrigins);
   await app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => cb(null, !origin || allowedOrigins.has('*') || allowedOrigins.has(origin)),
     methods: [...connectCors.allowedMethods],
     allowedHeaders: [...connectCors.allowedHeaders, 'authorization', 'x-internal-service-token'],
     exposedHeaders: [...connectCors.exposedHeaders],
     maxAge: 7200,
+  });
+
+  app.addHook('onRequest', async (request) => {
+    request.headers[CLIENT_IP_HEADER] = (request.ip || 'unknown').replace('::ffff:', '');
   });
 
   // Defence-in-depth for the FL bridge: when the shared internal token is presented, the caller's IP must

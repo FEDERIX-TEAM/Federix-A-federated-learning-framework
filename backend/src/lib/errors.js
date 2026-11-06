@@ -7,4 +7,5 @@ export const failedPrecondition = (msg) => new ConnectError(msg, Code.FailedPrec
 export const permissionDenied = (msg) => new ConnectError(msg, Code.PermissionDenied);
 export const unauthenticated = (msg) => new ConnectError(msg, Code.Unauthenticated);
 export const unavailable = (msg) => new ConnectError(msg, Code.Unavailable);
+export const resourceExhausted = (msg) => new ConnectError(msg, Code.ResourceExhausted);
 export const notImplementedYet = (rpc) => new ConnectError(`${rpc} is part of protocol v1.1 and is not available on this server yet`, Code.Unimplemented);

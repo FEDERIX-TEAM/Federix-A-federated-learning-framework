@@ -1,6 +1,7 @@
 import { ConnectError, Code } from '@connectrpc/connect';
 import { createAccessControlInterceptor } from '../interceptors/accessControl.interceptor.js';
 import { createMaintenanceInterceptor } from '../interceptors/maintenance.interceptor.js';
+import { createRateLimitInterceptor } from '../interceptors/rateLimit.interceptor.js';
 import { recordRequest } from './lib/metrics.js';
 
 /** Outermost: logs every call and hides internal error details (Mongo/Mongoose errors etc.) from clients. */
@@ -51,6 +52,7 @@ export function buildInterceptors({ redis, logger }) {
   return [
     createErrorInterceptor(logger),
     createAccessControlInterceptor(redis),
+    createRateLimitInterceptor(redis),
     createMaintenanceInterceptor(redis),
   ];
 }
