@@ -82,14 +82,17 @@ export function createSystemService({ redis }) {
 
     async flushCache(_req, ctx) {
       const flushed = await redis.dbsize();
+      const maintenance = await redis.get('system:maintenance');
+      const maintenanceTtl = maintenance ? await redis.ttl('system:maintenance') : -1;
       await redis.flushdb();
+      if (maintenance && maintenanceTtl > 0) await redis.set('system:maintenance', maintenance, 'EX', maintenanceTtl);
       await logEvent({ actor: authOf(ctx).sub, eventType: 'system.cache_flushed', details: { flushed } });
 
       return {
         flushedKeys: flushed,
         warning:
-          'Redis was flushed: every session was ended, so all users and clients must log in again, ' +
-          'and the maintenance flag was cleared.',
+          'Redis was flushed: every session was ended, so all users and clients must log in again. ' +
+          'Rate-limit windows and login lockouts were reset. Maintenance mode was kept.',
       };
     },
   };

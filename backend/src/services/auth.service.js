@@ -8,12 +8,35 @@ import { logEvent } from '../../utils/auditLog.js';
 import { ROLE_TO_PROTO, ROLE_FROM_PROTO, dateToIso } from '../../utils/protoMappers.js';
 import { authOf } from '../lib/helpers.js';
 import { createSessionStore, ROTATED, REUSE_DETECTED } from '../lib/sessions.js';
-import { invalidArg, notFound, alreadyExists, permissionDenied, unauthenticated } from '../lib/errors.js';
+import { invalidArg, notFound, alreadyExists, permissionDenied, unauthenticated, resourceExhausted } from '../lib/errors.js';
 
 const CREATABLE_ROLES = ['admin', 'fl_engineer', 'viewer'];
 
 export function createAuthService({ redis }) {
   const sessions = createSessionStore(redis);
+  const lockKey = (kind, id) => `login:fail:${kind}:${id}`;
+
+  async function assertNotLocked(kind, id) {
+    const key = lockKey(kind, id);
+    const failures = Number((await redis.get(key)) ?? 0);
+    if (failures >= config.loginLockout.maxAttempts) {
+      const ttl = await redis.ttl(key);
+      throw resourceExhausted(`Too many failed login attempts; try again in ${Math.max(1, ttl)}s`);
+    }
+  }
+
+  async function recordFailedLogin(kind, id) {
+    const key = lockKey(kind, id);
+    const [[, failures]] = await redis.multi().incr(key).expire(key, config.loginLockout.lockoutSeconds, 'NX').exec();
+    if (failures === config.loginLockout.maxAttempts) {
+      await logEvent({ level: 'warn', actor: id, eventType: 'auth.login_locked', details: { kind, failures } });
+    }
+  }
+
+  async function clearFailedLogins(kind, id) {
+    await redis.del(lockKey(kind, id));
+  }
+
   return {
     // Public
     async register(req) {
@@ -41,10 +64,13 @@ export function createAuthService({ redis }) {
       const { clientId, apiKey } = req;
       if (!clientId || !apiKey) throw invalidArg('client_id and api_key are required');
 
+      await assertNotLocked('client', clientId);
       const client = await Client.findOne({ client_id: clientId });
       if (!client || !(await verifyPassword(apiKey, client.api_key_hash))) {
+        await recordFailedLogin('client', clientId);
         throw unauthenticated('Invalid client_id or api_key');
       }
+      await clearFailedLogins('client', clientId);
       if (client.isBanned()) {
         const until = client.banned_until.getTime() === 0 ? 'permanently' : `until ${dateToIso(client.banned_until)}`;
         throw permissionDenied(`Client is banned ${until}`);
@@ -64,10 +90,14 @@ export function createAuthService({ redis }) {
       const { email, password } = req;
       if (!email || !password) throw invalidArg('email and password are required');
 
-      const user = await AdminUser.findOne({ email: email.toLowerCase().trim() });
+      const normalized = email.toLowerCase().trim();
+      await assertNotLocked('admin', normalized);
+      const user = await AdminUser.findOne({ email: normalized });
       if (!user || !(await verifyPassword(password, user.password_hash))) {
+        await recordFailedLogin('admin', normalized);
         throw unauthenticated('Invalid email or password');
       }
+      await clearFailedLogins('admin', normalized);
 
       const session = await sessions.start({ sub: user.user_id, role: user.role });
 

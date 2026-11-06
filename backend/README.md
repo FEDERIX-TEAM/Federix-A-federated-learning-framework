@@ -82,6 +82,7 @@ and is frozen per round in `config_snapshot`.
 | `PORT` / `HOST` | `4000` / `0.0.0.0` | 1–65535 | Listen address |
 | `LOG_LEVEL` | `info` | fatal … trace, silent | Server log level |
 | `HTTP2` | `false` | true/false | HTTP/2 cleartext for native gRPC clients |
+| `TRUST_PROXY` | `false` | true/false | Take the client IP from `X-Forwarded-For`; enable only behind a reverse proxy you control |
 | `TLS_KEY` / `TLS_CERT` | unset | both or neither | HTTP/2 over TLS with HTTP/1.1 fallback |
 | `MONGO_URI` / `REDIS_URL` | local defaults | | Required services; the server will not start without them |
 | `DB_CONNECT_TIMEOUT_MS` | `3000` | ≥ 100 | Startup connection timeout for MongoDB and Redis |
@@ -89,6 +90,14 @@ and is frozen per round in `config_snapshot`.
 | `REDIS_MAX_RETRIES_PER_REQUEST` | `3` | ≥ 0 | Retries for a Redis command during an outage |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev values | | Token signing secrets |
 | `JWT_ACCESS_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | `15m` / `7d` | number + s/m/h/d | Token lifetimes |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | comma list, `*` for any | Browser origins allowed to call the API (the dashboard); requests without an `Origin` header are unaffected |
+| `RATE_LIMIT_ENABLED` | `true` | true/false | Turns rate limiting on |
+| `RATE_LIMIT_WINDOW_SECONDS` | `60` | ≥ 1 | Length of a rate-limit window |
+| `RATE_LIMIT_PER_PRINCIPAL` | `1200` | ≥ 1 | Calls per window for one signed-in user or SDK client |
+| `RATE_LIMIT_PER_IP` | `300` | ≥ 1 | Calls per window per IP for public RPCs (login, register, health) |
+| `LOGIN_MAX_ATTEMPTS` | `5` | ≥ 1 | Failed logins for one account before it is locked |
+| `LOGIN_LOCKOUT_SECONDS` | `900` | ≥ 1 | How long a locked account stays locked |
+| `AUDIT_LOG_RETENTION_DAYS` | `90` | ≥ 0 | Audit entries older than this are deleted; `0` keeps them forever |
 | `BCRYPT_ROUNDS` | `10` | 4–15 | Cost of password and API-key hashes |
 | `MIN_SECRET_LENGTH` | `32` | ≥ 16 | Minimum secret length in production |
 | `MIN_PASSWORD_LENGTH` | `8` | ≥ 6 | Minimum admin password length |
@@ -138,6 +147,9 @@ and is frozen per round in `config_snapshot`.
 - **FL server ↔ Central Server:** shared secret header + IP allowlist; no JWT.
 - Access tokens are short-lived (15m); `RefreshToken` mints new ones. `Logout` blacklists the token's `jti` in Redis until it expires.
 - **RBAC is fail-closed:** every RPC must have a rule in `interceptors/rbacRules.js`, otherwise calls are rejected with `Internal`. **When you add an RPC, add its rule.**
+- **Rate limiting** (`interceptors/rateLimit.interceptor.js`): a fixed window in Redis, `RATE_LIMIT_PER_PRINCIPAL` calls per signed-in user or client and `RATE_LIMIT_PER_IP` per IP for public RPCs; over the limit the call fails with `ResourceExhausted` and says when to retry. The client IP is set by the server, never taken from a request header, and the FL server's internal calls are exempt.
+- **Login lockout:** after `LOGIN_MAX_ATTEMPTS` failed logins an admin email or SDK client id is locked for `LOGIN_LOCKOUT_SECONDS` (`ResourceExhausted`), even with the right password; a successful login resets the count.
+- **CORS** answers only for `CORS_ALLOWED_ORIGINS`.
 - Maintenance mode (`SetMaintenance`) blocks `ClientService` and the FL server's new-work RPCs (`TriggerRound`, `PushModel`, `ComputeUtility`) with `Unavailable`. An aggregation already in progress can finish (`CompleteRound`, `GetRoundUpdates`, `GetModelUploadUrl`), and status reporting and `WatchRounds` keep working. Admin/system RPCs stay reachable so it can be switched off.
 
 ## RPCs and permissions
@@ -341,8 +353,8 @@ that maps them to proto enum numbers. Handlers receive/return plain objects with
 - **Events and the scheduler are in-process.** Fine for one instance; for horizontal scaling back `src/lib/events.js` with Redis pub/sub and run the scheduler on one instance (its updates are atomic, so a second instance is safe but redundant).
 - `FlBridgeService.CompleteRound` always reports `next_round_scheduled: false` (no auto-scheduler).
 - A permanent ban returns `banned_until: ""` from `BanClient` (stored as epoch 0).
-- No automated unit tests beyond the end-to-end smoke test; no rate limiting (the old REST server had 300 req/min — add a Connect interceptor or put a gateway in front).
-- `FlushCache` also clears the logout blacklist, so previously logged-out tokens work again until they expire.
+- Rate-limit counters live in the shared Redis, so limits hold across instances; behind a reverse proxy set `TRUST_PROXY=true` so per-IP limits see the real client IP.
+- `FlushCache` ends every session and resets rate-limit windows and lockouts; maintenance mode is kept.
 - Change every default secret in `.env` before deploying.
 
 ## Changes vs. the old REST `backend/`

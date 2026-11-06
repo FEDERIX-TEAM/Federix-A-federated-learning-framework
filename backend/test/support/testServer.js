@@ -128,6 +128,7 @@ export async function startTestServer({ env = {} } = {}) {
       PUBLIC_BASE_URL: baseUrl,
       LOG_LEVEL: 'warn',
       SCHEDULER_INTERVAL_MS: '3600000',
+      RATE_LIMIT_ENABLED: 'false',
       ...env,
     },
     stdio: ['ignore', 'ignore', 'pipe'],
@@ -220,5 +221,5 @@ export async function startTestServer({ env = {} } = {}) {
     return { ...done, newModelVersion, updates: ups, model };
   }
 
-  return { baseUrl, dbName, storageDir, api, superAdmin, internal, newSdkClient, submitUpdate, uploadModel, completeRound, nextModelVersion, stop: cleanup };
+  return { baseUrl, dbName, storageDir, api, superAdmin, adminCredentials: admin, internal, newSdkClient, submitUpdate, uploadModel, completeRound, nextModelVersion, stop: cleanup };
 }

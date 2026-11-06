@@ -90,6 +90,7 @@ export const config = {
 
   server: {
     http2: bool('HTTP2', false),
+    trustProxy: bool('TRUST_PROXY', false),
     tlsKey: str('TLS_KEY', null),
     tlsCert: str('TLS_CERT', null),
   },
@@ -109,6 +110,26 @@ export const config = {
     refreshSecret: str('JWT_REFRESH_SECRET', 'dev_refresh_secret_change_me'),
     accessExpiresIn: duration('JWT_ACCESS_EXPIRES_IN', '15m'),
     refreshExpiresIn: duration('JWT_REFRESH_EXPIRES_IN', '7d'),
+  },
+
+  cors: {
+    allowedOrigins: list('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'),
+  },
+
+  rateLimit: {
+    enabled: bool('RATE_LIMIT_ENABLED', true),
+    windowSeconds: int('RATE_LIMIT_WINDOW_SECONDS', 60, { min: 1 }),
+    perPrincipal: int('RATE_LIMIT_PER_PRINCIPAL', 1200, { min: 1 }),
+    perIp: int('RATE_LIMIT_PER_IP', 300, { min: 1 }),
+  },
+
+  loginLockout: {
+    maxAttempts: int('LOGIN_MAX_ATTEMPTS', 5, { min: 1 }),
+    lockoutSeconds: int('LOGIN_LOCKOUT_SECONDS', 900, { min: 1 }),
+  },
+
+  audit: {
+    retentionDays: int('AUDIT_LOG_RETENTION_DAYS', 90, { min: 0 }),
   },
 
   security: {
