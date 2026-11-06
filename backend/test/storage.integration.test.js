@@ -160,7 +160,7 @@ test('invalid resource paths are refused even with a valid signature', async () 
 });
 
 test('a model URL from GetModelDownload is absolute and downloads the stored file', async () => {
-  const version = 1 + Math.floor(Math.random() * 1e9);
+  const version = await srv.nextModelVersion();
   const body = crypto.randomBytes(4096);
   assert.equal((await put(uploadUrl(`/models/${version}`), body)).status, 201);
   await srv.api.fl.pushModel({ modelVersion: version, weightsUrl: `/models/${version}` }, srv.internal);
@@ -175,7 +175,7 @@ test('a model URL from GetModelDownload is absolute and downloads the stored fil
 });
 
 test('deleting a model also deletes its stored file', async () => {
-  const oldVersion = 1 + Math.floor(Math.random() * 1e9);
+  const oldVersion = await srv.nextModelVersion();
   await put(uploadUrl(`/models/${oldVersion}`), Buffer.from('old model'));
   await srv.api.fl.pushModel({ modelVersion: oldVersion, weightsUrl: `/models/${oldVersion}` }, srv.internal);
   await put(uploadUrl(`/models/${oldVersion + 1}`), Buffer.from('newer model'));

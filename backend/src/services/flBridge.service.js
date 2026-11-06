@@ -7,9 +7,11 @@ import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
 import { computeUtilityScore, utilityTier, utilityConfigToProto } from '../../utils/utilityScore.js';
 import { logEvent } from '../../utils/auditLog.js';
-import { COMPRESSION_LEVEL_TO_PROTO, labelDistributionToMessage } from '../../utils/protoMappers.js';
+import { COMPRESSION_LEVEL_TO_PROTO, ROUND_READY_REASON_TO_PROTO, FL_SERVER_STATE_FROM_PROTO, labelDistributionToMessage } from '../../utils/protoMappers.js';
+import { FlServerStatus } from '../../models/FlServerStatus.js';
+import { readyEventOf, usableUpdateIds } from '../roundScheduler.js';
 import { configForRound, configForCurrentRound, num } from '../lib/helpers.js';
-import { invalidArg, notFound, alreadyExists, failedPrecondition, notImplementedYet } from '../lib/errors.js';
+import { invalidArg, notFound, alreadyExists, failedPrecondition } from '../lib/errors.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 import { storage } from '../storage.js';
 
@@ -28,33 +30,47 @@ async function storedModelFile(version, url) {
   return file;
 }
 
-async function activateNewModel(fields) {
-  if (await GlobalModel.exists({ model_version: fields.model_version })) {
-    throw alreadyExists(`Model version ${fields.model_version} already exists`);
+async function assertNewVersion(version) {
+  if (await GlobalModel.exists({ model_version: version })) throw alreadyExists(`Model version ${version} already exists`);
+  const latest = await GlobalModel.findOne().sort({ model_version: -1 }).select('model_version').lean();
+  if (latest && version <= latest.model_version) {
+    throw failedPrecondition(`Model version must be greater than the latest version ${latest.model_version}`);
   }
+}
+
+async function activateNewModel(fields) {
+  await assertNewVersion(fields.model_version);
   await GlobalModel.updateMany({}, { is_active: false });
   return GlobalModel.create({ model_id: newId(), ...fields, is_active: true });
 }
 
-export function createFlBridgeService() {
+export function createFlBridgeService({ scheduler } = {}) {
   return {
     async triggerRound(req) {
       if (!req.roundId) throw invalidArg('round_id is required');
       const round = await Round.findOne({ round_id: req.roundId });
       if (!round) throw notFound('Round not found');
-      if (!['active', 'aggregating'].includes(round.status)) {
-        throw failedPrecondition(`Round is ${round.status}; cannot start aggregation`);
-      }
+      if (round.status !== 'active') throw failedPrecondition(`Round is ${round.status}; aggregation can only start on an active round`);
 
-      round.status = 'aggregating';
-      await round.save();
+      const usable = await usableUpdateIds(req.roundId);
+      const requested = req.updateIds ?? [];
+      const unknown = requested.filter((id) => !usable.includes(id));
+      if (unknown.length) throw invalidArg(`update_ids contains updates that are not usable in this round: ${unknown.join(', ')}`);
+      const chosen = requested.length ? requested : usable;
 
-      publish('round_aggregating', { round_id: req.roundId, accepted_updates: req.updateIds.length }, ADMIN_ROLES);
-      await logEvent({ actor: 'fl-server', eventType: 'round.aggregation_triggered', details: { round_id: req.roundId } });
+      const now = new Date();
+      const updated = await Round.findOneAndUpdate(
+        { round_id: req.roundId, status: 'active' },
+        { $set: { status: 'aggregating', aggregating_started_at: now, aggregation_update_ids: chosen, ready_at: round.ready_at ?? now } },
+        { returnDocument: 'after' }
+      );
+      if (!updated) throw failedPrecondition('Aggregation for this round was already started');
 
-      // Heuristic estimate; the real FL server may ignore it.
+      publish('round_aggregating', { round_id: req.roundId, accepted_updates: chosen.length }, ADMIN_ROLES);
+      await logEvent({ actor: 'fl-server', eventType: 'round.aggregation_triggered', details: { round_id: req.roundId, updates: chosen.length } });
+
       const { baseMs, perUpdateMs } = appConfig.aggregationEstimate;
-      return { accepted: true, estimatedDurationMs: Math.max(baseMs, req.updateIds.length * perUpdateMs) };
+      return { accepted: true, estimatedDurationMs: Math.max(baseMs, chosen.length * perUpdateMs) };
     },
 
     async completeRound(req) {
@@ -63,8 +79,8 @@ export function createFlBridgeService() {
       }
       const round = await Round.findOne({ round_id: req.roundId });
       if (!round) throw notFound('Round not found');
-      if (!['active', 'aggregating'].includes(round.status)) {
-        throw failedPrecondition(`Round is already ${round.status}`);
+      if (round.status !== 'aggregating') {
+        throw failedPrecondition(`Round is ${round.status}; call TriggerRound before CompleteRound`);
       }
 
       const usable = await Update.find({ round_id: req.roundId, status: { $in: ['accepted', 'compressed'] } }).select('update_id').lean();
@@ -74,21 +90,32 @@ export function createFlBridgeService() {
       if (unknown.length) throw invalidArg(`used_update_ids contains updates that are not usable in this round: ${unknown.join(', ')}`);
 
       const file = await storedModelFile(req.newModelVersion, req.modelUrl);
-      const model = await activateNewModel({
-        model_version: req.newModelVersion,
-        size_bytes: file.bytes,
-        sha256: file.sha256,
-        round_id: req.roundId,
-        weights_url: req.modelUrl,
-        metrics: { global_loss: req.globalLoss, global_accuracy: req.globalAccuracy },
-      });
+      const claimed = await Round.findOneAndUpdate(
+        { round_id: req.roundId, status: 'aggregating' },
+        { $set: { status: 'complete', completed_at: new Date() }, $unset: { running: 1 } },
+        { returnDocument: 'after' }
+      );
+      if (!claimed) throw failedPrecondition('This round was completed or failed while the model was being registered');
 
-      round.status = 'complete';
-      round.model_version_after = req.newModelVersion;
-      round.global_loss = req.globalLoss;
-      round.global_accuracy = req.globalAccuracy;
-      round.completed_at = new Date();
-      await round.save();
+      let model;
+      try {
+        model = await activateNewModel({
+          model_version: req.newModelVersion,
+          size_bytes: file.bytes,
+          sha256: file.sha256,
+          round_id: req.roundId,
+          weights_url: req.modelUrl,
+          metrics: { global_loss: req.globalLoss, global_accuracy: req.globalAccuracy },
+        });
+      } catch (err) {
+        await Round.updateOne({ round_id: req.roundId, status: 'complete' }, { $set: { status: 'aggregating', running: true, completed_at: null } });
+        throw err;
+      }
+
+      await Round.updateOne(
+        { round_id: req.roundId },
+        { $set: { model_version_after: req.newModelVersion, global_loss: req.globalLoss, global_accuracy: req.globalAccuracy } }
+      );
 
       if (used.length) {
         await Update.updateMany(
@@ -186,17 +213,57 @@ export function createFlBridgeService() {
       }
     },
 
-    async *watchRounds() {
-      throw notImplementedYet('FlBridgeService.WatchRounds');
+    async *watchRounds(req, ctx) {
+      if (!scheduler) throw failedPrecondition('Round scheduler is not running on this server');
+      const queue = [];
+      let wake = null;
+      const push = (event) => {
+        queue.push(event);
+        wake?.();
+      };
+      const unsubscribe = scheduler.onReady((event) => push({ ...event, reason: ROUND_READY_REASON_TO_PROTO[event.reason] }));
+      const onAbort = () => wake?.();
+      ctx.signal.addEventListener('abort', onAbort);
+
+      try {
+        const pending = await Round.find({ status: { $in: ['active', 'aggregating'] }, ready_at: { $ne: null } }).sort({ round_number: 1 });
+        for (const r of pending) {
+          const reason = r.status === 'aggregating' ? 'resumed' : r.ready_reason;
+          yield { ...readyEventOf(r, reason), reason: ROUND_READY_REASON_TO_PROTO[reason] };
+        }
+        await logEvent({ actor: 'fl-server', eventType: 'fl.watch_started', details: { worker_id: req.workerId || null } });
+
+        while (!ctx.signal.aborted) {
+          if (queue.length === 0) {
+            let timer;
+            await new Promise((resolve) => {
+              wake = resolve;
+              timer = setTimeout(resolve, appConfig.scheduler.watchKeepaliveMs);
+            });
+            clearTimeout(timer);
+            wake = null;
+            if (ctx.signal.aborted) break;
+            if (queue.length === 0) {
+              yield { roundId: '', roundNumber: 0, reason: ROUND_READY_REASON_TO_PROTO.keepalive, updateCount: 0, modelVersionBefore: 0, readyAt: new Date().toISOString() };
+              continue;
+            }
+          }
+          yield queue.shift();
+        }
+      } finally {
+        unsubscribe();
+        ctx.signal.removeEventListener('abort', onAbort);
+      }
     },
 
     async getModelUploadUrl(req) {
       if (!Number.isInteger(req.modelVersion) || req.modelVersion <= 0) throw invalidArg('model_version must be > 0');
-      if (await GlobalModel.exists({ model_version: req.modelVersion })) {
-        throw alreadyExists(`Model version ${req.modelVersion} already exists`);
-      }
+      await assertNewVersion(req.modelVersion);
       const maxBytes = appConfig.limits.maxModelSizeMb * MB;
       const resourcePath = modelPath(req.modelVersion);
+      if (await storage.remove(resourcePath)) {
+        await logEvent({ level: 'warn', actor: 'fl-server', eventType: 'model.orphan_removed', details: { model_version: req.modelVersion } });
+      }
       const signed = signedUrl.sign(resourcePath, { method: 'PUT', maxBytes, overwrite: false });
       return {
         upload: {
@@ -209,8 +276,38 @@ export function createFlBridgeService() {
       };
     },
 
-    async reportFlStatus() {
-      throw notImplementedYet('FlBridgeService.ReportFlStatus');
+    async reportFlStatus(req) {
+      const workerId = (req.workerId ?? '').trim();
+      if (!/^[A-Za-z0-9._:-]{1,64}$/.test(workerId)) throw invalidArg('worker_id must be 1-64 characters of letters, digits, . _ : -');
+      const state = FL_SERVER_STATE_FROM_PROTO[req.state];
+      if (!state) throw invalidArg('state must be one of STARTING, IDLE, AGGREGATING, ERROR');
+      const clip = (v, n) => String(v ?? '').slice(0, n);
+      const now = new Date();
+
+      const previous = await FlServerStatus.findOneAndUpdate(
+        { worker_id: workerId },
+        {
+          $set: {
+            state,
+            current_round_id: req.currentRoundId || null,
+            version: clip(req.version, 64),
+            message: clip(req.message, 500),
+            last_error: clip(req.lastError, 2000),
+            last_report_at: now,
+          },
+        },
+        { upsert: true, returnDocument: 'before' }
+      );
+      if (!previous || previous.state !== state) {
+        publish('fl_server_status', { worker_id: workerId, state, current_round_id: req.currentRoundId || null }, ADMIN_ROLES);
+        await logEvent({
+          level: state === 'error' ? 'error' : 'info',
+          actor: 'fl-server',
+          eventType: 'fl.status_changed',
+          details: { worker_id: workerId, state, last_error: clip(req.lastError, 500) || null },
+        });
+      }
+      return { accepted: true, serverTime: now.toISOString() };
     },
 
     async getFlConfig() {

@@ -11,6 +11,7 @@ import { createClient } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-node';
 import { config } from '../../config/index.js';
 import { AdminUser } from '../../models/AdminUser.js';
+import { GlobalModel } from '../../models/GlobalModel.js';
 import { hashPassword } from '../../utils/password.js';
 import { newId } from '../../utils/ids.js';
 import { AuthService } from '../../src/gen/auth_pb.js';
@@ -126,6 +127,7 @@ export async function startTestServer({ env = {} } = {}) {
       STORAGE_DIR: storageDir,
       PUBLIC_BASE_URL: baseUrl,
       LOG_LEVEL: 'warn',
+      SCHEDULER_INTERVAL_MS: '3600000',
       ...env,
     },
     stdio: ['ignore', 'ignore', 'pipe'],
@@ -195,6 +197,11 @@ export async function startTestServer({ env = {} } = {}) {
     return { prepared, submitted, sha256, bytes: payload.length };
   }
 
+  async function nextModelVersion() {
+    const latest = await GlobalModel.findOne().sort({ model_version: -1 }).select('model_version').lean();
+    return (latest?.model_version ?? 0) + 1;
+  }
+
   async function uploadModel(version, body = randomBytes(4096)) {
     const { upload, resourcePath } = await api.fl.getModelUploadUrl({ modelVersion: version }, internal);
     const res = await fetch(upload.url, { method: 'PUT', body });
@@ -205,7 +212,7 @@ export async function startTestServer({ env = {} } = {}) {
   async function completeRound(roundId, { globalLoss = 0.4, globalAccuracy = 0.9, version } = {}) {
     const ups = await collect(api.fl.getRoundUpdates({ roundId }, internal));
     await api.fl.triggerRound({ roundId, updateIds: ups.map((u) => u.updateId) }, internal);
-    const newModelVersion = version ?? 1 + Math.floor(Math.random() * 1e9);
+    const newModelVersion = version ?? (await nextModelVersion());
     const model = await uploadModel(newModelVersion);
     const done = await api.fl.completeRound({
       roundId, newModelVersion, modelUrl: model.resourcePath, globalLoss, globalAccuracy, usedUpdateIds: ups.map((u) => u.updateId),
@@ -213,5 +220,5 @@ export async function startTestServer({ env = {} } = {}) {
     return { ...done, newModelVersion, updates: ups, model };
   }
 
-  return { baseUrl, dbName, storageDir, api, superAdmin, internal, newSdkClient, submitUpdate, uploadModel, completeRound, stop: cleanup };
+  return { baseUrl, dbName, storageDir, api, superAdmin, internal, newSdkClient, submitUpdate, uploadModel, completeRound, nextModelVersion, stop: cleanup };
 }

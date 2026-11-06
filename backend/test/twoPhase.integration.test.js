@@ -272,7 +272,7 @@ test('StopRound also rejects prepared updates', async () => {
 });
 
 test('GetModelUploadUrl hands out a one-time, size-limited model upload', async () => {
-  const version = 1 + Math.floor(Math.random() * 1e9);
+  const version = await srv.nextModelVersion();
   const { upload, resourcePath } = await srv.api.fl.getModelUploadUrl({ modelVersion: version }, srv.internal);
   assert.equal(resourcePath, `/models/${version}`);
   assert.ok(upload.url.includes(`/storage/models/${version}?`));
@@ -286,7 +286,7 @@ test('GetModelUploadUrl hands out a one-time, size-limited model upload', async 
 });
 
 test('models can only be registered from an uploaded file, and its size and sha256 are recorded', async () => {
-  const version = 1 + Math.floor(Math.random() * 1e9);
+  const version = await srv.nextModelVersion();
   await assert.rejects(srv.api.fl.pushModel({ modelVersion: version, weightsUrl: 's3://elsewhere/model.bin' }, srv.internal), isCode(Code.InvalidArgument, /must be \/models\//));
   await assert.rejects(srv.api.fl.pushModel({ modelVersion: version, weightsUrl: `/models/${version}` }, srv.internal), isCode(Code.FailedPrecondition, /has not been uploaded/));
 
@@ -307,7 +307,7 @@ test('models can only be registered from an uploaded file, and its size and sha2
 
 test('PushModel is refused while a round is running', async () => {
   await withRound(async () => {
-    const version = 1 + Math.floor(Math.random() * 1e9);
+    const version = await srv.nextModelVersion();
     const model = await srv.uploadModel(version);
     await assert.rejects(srv.api.fl.pushModel({ modelVersion: version, weightsUrl: model.resourcePath }, srv.internal), isCode(Code.FailedPrecondition, /round is running/));
   });
@@ -321,7 +321,8 @@ test('CompleteRound needs the uploaded model and records which updates were used
   const b = await srv.submitUpdate(unused, { roundId: round.roundId, ...GOOD });
   await srv.api.fl.triggerRound({ roundId: round.roundId, updateIds: [] }, srv.internal);
 
-  const version = 1 + Math.floor(Math.random() * 1e9);
+  const version = await srv.nextModelVersion();
+  await srv.api.fl.getModelUploadUrl({ modelVersion: version }, srv.internal);
   await assert.rejects(
     srv.api.fl.completeRound({ roundId: round.roundId, newModelVersion: version, modelUrl: `/models/${version}`, globalLoss: 0.3, globalAccuracy: 0.9 }, srv.internal),
     isCode(Code.FailedPrecondition, /has not been uploaded/)
@@ -347,7 +348,7 @@ test('CompleteRound needs the uploaded model and records which updates were used
 });
 
 test('communication metrics report measured upload bytes and the savings against the dense model size', async () => {
-  const base = 1 + Math.floor(Math.random() * 1e9);
+  const base = await srv.nextModelVersion();
   const baseModel = await srv.uploadModel(base, crypto.randomBytes(10_000));
   await srv.api.fl.pushModel({ modelVersion: base, weightsUrl: baseModel.resourcePath }, srv.internal);
 

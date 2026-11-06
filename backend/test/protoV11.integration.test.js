@@ -25,7 +25,6 @@ after(async () => {
 });
 
 const isCode = (code) => (err) => err instanceof ConnectError && err.code === code;
-const unimplemented = (err) => isCode(Code.Unimplemented)(err) && /protocol v1\.1/.test(err.message);
 
 test('every RPC in every service has an access rule', () => {
   const missing = [];
@@ -54,9 +53,21 @@ test('PrepareUpdate: SDK clients reach the handler, others are refused', async (
 });
 
 test('WatchRounds, GetModelUploadUrl and ReportFlStatus need the internal token', async () => {
-  await assert.rejects(collect(srv.api.fl.watchRounds({ workerId: 'w1' }, srv.internal)), unimplemented);
+  const ac = new AbortController();
+  const stream = srv.api.fl.watchRounds({ workerId: 'w1' }, { ...srv.internal, signal: ac.signal });
+  const reader = (async () => {
+    try {
+      for await (const e of stream) return e;
+    } catch {
+      return null;
+    }
+    return null;
+  })();
+  await new Promise((r) => setTimeout(r, 200));
+  ac.abort();
+  await reader;
   assert.match((await srv.api.fl.getModelUploadUrl({ modelVersion: 1 }, srv.internal)).upload.url, /\/storage\/models\/1\?/);
-  await assert.rejects(srv.api.fl.reportFlStatus({ workerId: 'w1', state: FlServerState.IDLE }, srv.internal), unimplemented);
+  assert.equal((await srv.api.fl.reportFlStatus({ workerId: 'w1', state: FlServerState.IDLE }, srv.internal)).accepted, true);
 
   await assert.rejects(collect(srv.api.fl.watchRounds({}, client)), isCode(Code.Unauthenticated));
   await assert.rejects(srv.api.fl.getModelUploadUrl({ modelVersion: 1 }, srv.superAdmin), isCode(Code.Unauthenticated));
@@ -64,7 +75,7 @@ test('WatchRounds, GetModelUploadUrl and ReportFlStatus need the internal token'
 });
 
 test('GetFlServerStatus is open to dashboard roles only', async () => {
-  await assert.rejects(srv.api.admin.getFlServerStatus({}, srv.superAdmin), unimplemented);
+  assert.equal((await srv.api.admin.getFlServerStatus({}, srv.superAdmin)).workerId, 'w1');
   await assert.rejects(srv.api.admin.getFlServerStatus({}, client), isCode(Code.PermissionDenied));
   await assert.rejects(srv.api.admin.getFlServerStatus({}), isCode(Code.Unauthenticated));
 });
@@ -87,7 +98,7 @@ test('GetFlConfig now includes local_epochs, batch_size and max_clients', async 
 });
 
 test('ListModels reports the stored model format', async () => {
-  const version = 1 + Math.floor(Math.random() * 1e9);
+  const version = await srv.nextModelVersion();
   await srv.uploadModel(version);
   await srv.api.fl.pushModel({ modelVersion: version, weightsUrl: `/models/${version}` }, srv.internal);
   const m = (await collect(srv.api.admin.listModels({}, srv.superAdmin))).find((x) => x.modelVersion === version);

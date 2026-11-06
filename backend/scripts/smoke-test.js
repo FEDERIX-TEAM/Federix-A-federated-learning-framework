@@ -237,14 +237,15 @@ async function main() {
   check('TriggerRound', trig.accepted && trig.estimatedDurationMs >= 5000);
   check('Round is aggregating', (await admin.getRoundDetail({ roundId: start.roundId }, SA)).status === RoundStatus.AGGREGATING);
   await expectCode('SubmitUpdate while aggregating -> FailedPrecondition', Code.FailedPrecondition, () => submit(clients[0], 1, 0.5, 100, {}));
-  const roundModelVersion = 1000 + Math.floor(Math.random() * 1e6);
+  const latestVersion = Math.max(0, ...(await collect(admin.listModels({}, SA))).map((m) => m.modelVersion));
+  const roundModelVersion = latestVersion + 1;
   await expectCode('CompleteRound without an uploaded model -> FailedPrecondition', Code.FailedPrecondition, () => fl.completeRound({ roundId: start.roundId, newModelVersion: roundModelVersion, modelUrl: `/models/${roundModelVersion}` }, internal));
   const roundModel = await uploadModel(roundModelVersion);
   const done = await fl.completeRound({ roundId: start.roundId, newModelVersion: roundModelVersion, modelUrl: roundModel.resourcePath, globalLoss: 0.42, globalAccuracy: 0.87, usedUpdateIds: ups.map((u) => u.updateId) }, internal);
   check('CompleteRound', done.success && !!done.modelId);
   check('CompleteRound credits participation to contributors', (await client.getStatus({}, clients[0])).roundCount === roundCountBefore + 1);
   check('CompleteRound does not credit rejected updates', (await client.getStatus({}, clients[2])).roundCount === 0);
-  const pushVersion = 2000000 + Math.floor(Math.random() * 1e6);
+  const pushVersion = roundModelVersion + 1;
   const pushed = await uploadModel(pushVersion);
   const push = await fl.pushModel({ modelVersion: pushVersion, weightsUrl: pushed.resourcePath, metrics: { globalLoss: 0.4, globalAccuracy: 0.9 } }, internal);
   check('PushModel', push.stored && !!push.modelId);
@@ -311,7 +312,8 @@ async function main() {
   const mm = await system.setMaintenance({ enabled: true, message: 'back soon', estimatedDurationMinutes: 5 }, SA);
   check('SetMaintenance on', mm.maintenanceMode);
   await expectCode('Client RPC during maintenance -> Unavailable', Code.Unavailable, () => client.getStatus({}, clients[0]));
-  await expectCode('FL RPC during maintenance -> Unavailable', Code.Unavailable, () => fl.getFlConfig({}, internal));
+  await expectCode('FL new-work RPC during maintenance -> Unavailable', Code.Unavailable, () => fl.pushModel({ modelVersion: 1, weightsUrl: '/models/1' }, internal));
+  check('FL status RPCs keep working during maintenance', (await fl.getFlConfig({}, internal)).minClients >= 1);
   check('Admin RPC still works in maintenance', (await admin.getOverview({}, SA)).health === 'ok');
   await system.setMaintenance({ enabled: false }, SA);
   check('Client RPC after maintenance off', (await client.getStatus({}, clients[0])).clientId === clients[0].id);

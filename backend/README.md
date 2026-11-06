@@ -8,7 +8,7 @@ dashboard API, and a live event stream.
 Connect**) · MongoDB + Mongoose · Redis (token blacklist + maintenance flag; auto-falls back to an
 in-memory stub in dev) · JWT · bcrypt.
 
-6 services / 62 RPCs are defined in `proto/`. 59 are implemented; `WatchRounds`, `ReportFlStatus` and `GetFlServerStatus` answer `Unimplemented` until the round scheduler lands.
+All 6 services / 62 RPCs defined in `proto/` are implemented.
 
 ## Quick start
 
@@ -108,6 +108,10 @@ and is frozen per round in `config_snapshot`.
 | `HEARTBEAT_TIMEOUT_MS` | `90000` | ≥ 100 | Silence after which a participant is dropped |
 | `EVENT_PING_INTERVAL_MS` | `30000` | ≥ 100 | Keep-alive ping on the event stream |
 | `EVENT_QUEUE_MAX` | `1000` | ≥ 1 | Queued events per slow subscriber before the oldest are dropped |
+| `SCHEDULER_INTERVAL_MS` | `1000` | ≥ 50 | How often running rounds are checked for readiness, deadlines and timeouts |
+| `AGGREGATION_TIMEOUT_SECONDS` | `900` | ≥ 1 | A ready round not picked up, or an aggregation not completed, within this time fails |
+| `WATCH_KEEPALIVE_MS` | `15000` | ≥ 100 | Keep-alive interval on the `WatchRounds` stream |
+| `FL_STATUS_STALE_AFTER_MS` | `60000` | ≥ 100 | The FL server counts as offline when its last status report is older than this |
 | `STREAM_AUTH_RECHECK_MS` | `30000` | ≥ 100 | How often an open event stream re-checks its session, token, role and ban state |
 | `CLIENT_STATUS_CHECK_INTERVAL_MS` | `60000` | ≥ 100 | How often client statuses and expired bans are updated |
 | `CLIENT_IDLE_AFTER_MS` | `300000` | ≥ 100, ≤ disconnected | Silence after which an active client becomes `idle` |
@@ -134,7 +138,7 @@ and is frozen per round in `config_snapshot`.
 - **FL server ↔ Central Server:** shared secret header + IP allowlist; no JWT.
 - Access tokens are short-lived (15m); `RefreshToken` mints new ones. `Logout` blacklists the token's `jti` in Redis until it expires.
 - **RBAC is fail-closed:** every RPC must have a rule in `interceptors/rbacRules.js`, otherwise calls are rejected with `Internal`. **When you add an RPC, add its rule.**
-- Maintenance mode (`SetMaintenance`) blocks `ClientService` and `FlBridgeService` with `Unavailable`; admin/system RPCs stay reachable so it can be switched off.
+- Maintenance mode (`SetMaintenance`) blocks `ClientService` and the FL server's new-work RPCs (`TriggerRound`, `PushModel`, `ComputeUtility`) with `Unavailable`. An aggregation already in progress can finish (`CompleteRound`, `GetRoundUpdates`, `GetModelUploadUrl`), and status reporting and `WatchRounds` keep working. Admin/system RPCs stay reachable so it can be switched off.
 
 ## RPCs and permissions
 
@@ -281,6 +285,24 @@ A `connected` event arrives first and a `ping` every 30s as keep-alive.
    `used_update_ids` (→ `complete`). The model must be at `/models/<version>`; its size and sha256 are recorded,
    unused updates are marked rejected and only contributors get participation credit.
 
+**Scheduler** (`src/roundScheduler.js`, every `SCHEDULER_INTERVAL_MS`):
+
+| Condition on an active round | Result |
+|---|---|
+| usable updates ≥ `max_clients` | ready, reason `max_updates` |
+| every joined participant finished and usable ≥ `min_clients` | ready, reason `all_submitted` |
+| deadline passed and usable ≥ `min_clients` | ready, reason `deadline` |
+| deadline passed and usable < `min_clients` | aborted; open updates rejected |
+| ready but not triggered within `AGGREGATION_TIMEOUT_SECONDS` | failed |
+| aggregating longer than `AGGREGATION_TIMEOUT_SECONDS` | failed |
+
+A ready round is announced on `WatchRounds`; on connect the stream also replays ready rounds and in-progress
+aggregations (`resumed`), and it sends a keep-alive every `WATCH_KEEPALIVE_MS`. Ready does not freeze the round:
+late updates are still accepted until `TriggerRound` (atomic, one caller wins) moves it to `aggregating`.
+`CompleteRound` needs `aggregating` and a model version greater than every existing one. The FL server reports
+its state with `ReportFlStatus`; the dashboard reads it with `GetFlServerStatus`, and `HealthCheck.flServer` is
+`online` while reports are newer than `FL_STATUS_STALE_AFTER_MS`. Nothing talks to the FL server directly.
+
 `StopRound` aborts and rejects every open update. `PushModel` registers a model outside a round (e.g. the initial
 model) and is refused while a round runs. Config changes apply from the *next* round. Participants silent for
 `HEARTBEAT_TIMEOUT_MS` are marked `dropped`.
@@ -316,8 +338,7 @@ that maps them to proto enum numbers. Handlers receive/return plain objects with
   only when `reject_below > 0`. The losses are still reported by the client; server-side checks come with the
   FL server.
 - **Communication metrics** use the bytes measured by storage; `bytes_saved` compares each upload with the size of the round's base model file.
-- **No round-deadline enforcement:** `deadline_at` is stored and returned, and `JoinRound` refuses after it, but nothing auto-aborts/aggregates a round when it passes. Something (the FL server or a timer here) must call `TriggerRound`/`StopRound`.
-- **Events are in-process.** Fine for one instance; for horizontal scaling back `src/lib/events.js` with Redis pub/sub.
+- **Events and the scheduler are in-process.** Fine for one instance; for horizontal scaling back `src/lib/events.js` with Redis pub/sub and run the scheduler on one instance (its updates are atomic, so a second instance is safe but redundant).
 - `FlBridgeService.CompleteRound` always reports `next_round_scheduled: false` (no auto-scheduler).
 - A permanent ban returns `banned_until: ""` from `BanClient` (stored as epoch 0).
 - No automated unit tests beyond the end-to-end smoke test; no rate limiting (the old REST server had 300 req/min — add a Connect interceptor or put a gateway in front).

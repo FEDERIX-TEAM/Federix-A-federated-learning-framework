@@ -85,6 +85,18 @@ export function ruleFor(serviceName, methodName) {
 
 // Routes gated behind maintenance mode when it's active (client + FL traffic only —
 // admin/system routes stay reachable so an admin can turn maintenance mode back off).
-export function isMaintenanceGated(serviceName) {
-  return serviceName === 'ClientService' || serviceName === 'FlBridgeService';
+const FL_ALLOWED_DURING_MAINTENANCE = new Set([
+  'CompleteRound',
+  'GetRoundUpdates',
+  'GetModelUploadUrl',
+  'GetFlConfig',
+  'GetFlStatus',
+  'ReportFlStatus',
+  'WatchRounds',
+]);
+
+export function isMaintenanceGated(serviceName, methodName) {
+  if (serviceName === 'ClientService') return true;
+  if (serviceName === 'FlBridgeService') return !FL_ALLOWED_DURING_MAINTENANCE.has(methodName);
+  return false;
 }
