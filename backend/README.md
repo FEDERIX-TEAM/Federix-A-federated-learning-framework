@@ -97,7 +97,13 @@ and is frozen per round in `config_snapshot`.
 | `STORAGE_DIR` | `./storage` | | Folder served by signed `/storage/...` URLs |
 | `SIGNED_URL_SECRET` | dev value | | HMAC secret for signed URLs |
 | `SIGNED_URL_TTL_SECONDS` | `600` | ≥ 1 | Lifetime of signed download URLs |
-| `MAX_UPDATE_SIZE_MB` | `256` | ≥ 1 | Maximum update size reported to clients |
+| `UPLOAD_URL_TTL_SECONDS` | `900` | ≥ 1 | Lifetime of signed upload URLs |
+| `SIGNED_URL_MAX_LIFETIME_SECONDS` | `86400` | ≥ 1 | How long after the first URL was issued it can still be refreshed |
+| `UPLOAD_PARTIAL_TTL_SECONDS` | `86400` | ≥ 1 | Unfinished uploads untouched this long are deleted |
+| `STORAGE_SWEEP_INTERVAL_MS` | `3600000` | ≥ 100 | How often unfinished uploads are cleaned up |
+| `PUBLIC_BASE_URL` | `http://127.0.0.1:<PORT>` | http(s) URL | Base of every signed URL; set it to the address clients use |
+| `MAX_UPDATE_SIZE_MB` | `256` | ≥ 1 | Largest client update accepted by storage |
+| `MAX_MODEL_SIZE_MB` | `1024` | ≥ 1 | Largest model file accepted by storage |
 | `HEARTBEAT_CHECK_INTERVAL_MS` | `30000` | ≥ 100 | How often missed heartbeats are checked |
 | `HEARTBEAT_TIMEOUT_MS` | `90000` | ≥ 100 | Silence after which a participant is dropped |
 | `EVENT_PING_INTERVAL_MS` | `30000` | ≥ 100 | Keep-alive ping on the event stream |
@@ -221,6 +227,29 @@ Generated from `interceptors/rbacRules.js`.
 |---|---|
 | Subscribe | any logged-in role |
 
+## Storage (signed URLs)
+
+Model and update files never travel inside an RPC. The server hands out short-lived HMAC-signed URLs under
+`PUBLIC_BASE_URL/storage/...`, and files are kept in `STORAGE_DIR` (`models/<version>`, `updates/<update_id>`).
+A signature covers the HTTP method, the path, the issue time, the expiry and, for uploads, the size limit and
+whether an existing file may be replaced. A download URL can't be used to upload, and changing any parameter
+breaks the signature.
+
+| Request | Purpose | Responses |
+|---|---|---|
+| `GET <url>` | Download the file | `200`; `206` with `Range: bytes=start-end`, `bytes=start-` or `bytes=-n`; `416` for a range outside the file; `403` bad or expired signature; `404` |
+| `HEAD <download url>` | File size before downloading | `content-length`, `accept-ranges: bytes` |
+| `PUT <url>` with the whole body | One-shot upload | `201 {path, bytes, sha256, complete}`; `413` over the limit; `409` exists and overwrite not allowed |
+| `PUT <url>` with `Content-Range: bytes start-end/total` | One chunk of a resumable upload | `202 {offset, total}` and an `upload-offset` header until the last chunk, then `201` as above; `409` with `upload-offset` if `start` is not where the upload stands |
+| `HEAD <upload url>` | Where an upload stands | `upload-offset`, `upload-length`, `upload-complete` |
+| `POST /storage/refresh/<path>?<query of any URL>` | Exchange an expired URL for a new one with the same rights | `200 {url, method, expiresAt, refreshUntil}`; `403` bad signature; `410` past `SIGNED_URL_MAX_LIFETIME_SECONDS` since first issued |
+
+**Resuming.** Bytes of a chunk are kept as they arrive, so after a dropped connection `HEAD` tells the client
+the exact offset to continue from, with the same URL or a refreshed one. Downloads resume with `Range`.
+Unfinished uploads untouched for `UPLOAD_PARTIAL_TTL_SECONDS` are deleted. Upload progress is tracked per
+server instance, so resumable uploads assume a single backend instance (or sticky routing) until storage moves
+to S3/GCS.
+
 ## Event stream (`EventStreamService.Subscribe`)
 
 Replaces the old WebSocket. Open it with a valid JWT; it streams `{ type, payload_json, timestamp }`.
@@ -261,7 +290,7 @@ that maps them to proto enum numbers. Handlers receive/return plain objects with
 
 ## Known stand-ins / what's left for the rest of the project
 
-- **Object storage is simulated.** `utils/signedUrl.js` makes HMAC-signed local URLs served from `STORAGE_DIR`; there is no upload endpoint (clients/FL server give URLs for their own storage). Swap in real S3/GCS presigned URLs there for production.
+- **Object storage is local.** Files live in `STORAGE_DIR` behind signed URLs with resumable uploads and range downloads (see Storage). RPCs that hand out upload URLs arrive with protocol v1.1; for production, swap `utils/signedUrl.js` and `src/storage.js` for S3/GCS presigned URLs.
 - **Utility score** (`utils/utilityScore.js`) is a simple formula (loss improvement 0.5 + data size 0.3 + label entropy 0.2) — replace with your research metric if needed.
 - **Communication metrics** approximate bytes from `data_size` (no real transport accounting).
 - **No round-deadline enforcement:** `deadline_at` is stored and returned, and `JoinRound` refuses after it, but nothing auto-aborts/aggregates a round when it passes. Something (the FL server or a timer here) must call `TriggerRound`/`StopRound`.

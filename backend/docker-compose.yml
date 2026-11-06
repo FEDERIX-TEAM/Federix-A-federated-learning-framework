@@ -39,10 +39,14 @@ services:
       SUPPORTED_SDK_VERSIONS: "1.0.0,1.1.0"
       SERVER_TIMEZONE: Asia/Kolkata
       MAX_UPDATE_SIZE_MB: "256"
+      STORAGE_DIR: /app/storage
+      PUBLIC_BASE_URL: http://127.0.0.1:4000
       BUILD_ID: docker-local
+    volumes: ["storage-data:/app/storage"]
     depends_on:
       mongo: { condition: service_healthy }
       redis: { condition: service_healthy }
 
 volumes:
   mongo-data:
+  storage-data:

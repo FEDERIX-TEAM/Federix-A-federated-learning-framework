@@ -124,6 +124,7 @@ export async function startTestServer({ env = {} } = {}) {
       INTERNAL_SERVICE_TOKEN: internalToken,
       FL_SERVER_ALLOWED_IPS: '127.0.0.1,::1,::ffff:127.0.0.1',
       STORAGE_DIR: storageDir,
+      PUBLIC_BASE_URL: baseUrl,
       LOG_LEVEL: 'warn',
       ...env,
     },
@@ -171,5 +172,5 @@ export async function startTestServer({ env = {} } = {}) {
     return { id: reg.clientId, apiKey: reg.apiKey, ...bearer(session.accessToken) };
   }
 
-  return { baseUrl, dbName, api, superAdmin, internal, newSdkClient, stop: cleanup };
+  return { baseUrl, dbName, storageDir, api, superAdmin, internal, newSdkClient, stop: cleanup };
 }

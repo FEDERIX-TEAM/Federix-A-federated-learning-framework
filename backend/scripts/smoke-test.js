@@ -212,7 +212,7 @@ async function main() {
   await expectCode('GetFlStatus as admin -> PermissionDenied', Code.PermissionDenied, () => fl.getFlStatus({}, adminUser));
   check('GetFlConfig', (await fl.getFlConfig({}, internal)).minClients === 2);
   const ups = await collect(fl.getRoundUpdates({ roundId: start.roundId }, internal));
-  check('GetRoundUpdates returns accepted+compressed only', ups.length === 2 && ups.every((u) => u.downloadUrl.startsWith('/storage/updates/')));
+  check('GetRoundUpdates returns accepted+compressed only', ups.length === 2 && ups.every((u) => new URL(u.downloadUrl).pathname.startsWith('/storage/updates/')));
   const util = await collect(fl.computeUtility({ roundId: start.roundId, updateIds: [s0.updateId, s1.updateId, s2.updateId] }, internal));
   check('ComputeUtility', util.length === 3);
   const utilById = Object.fromEntries(util.map((u) => [u.updateId, u]));
@@ -239,9 +239,9 @@ async function main() {
   check('Admin GetModelDownload', dl.downloadUrl.includes('sig='));
   const cdl = await client.getModelDownload({}, clients[0]);
   check('Client GetModelDownload (active)', cdl.modelVersion === pushVersion);
-  const bad = await fetch(BASE + dl.downloadUrl.replace(/sig=[0-9a-f]+/, 'sig=deadbeef'));
+  const bad = await fetch(dl.downloadUrl.replace(/sig=[0-9a-f]+/, 'sig=deadbeef'));
   check('Tampered signed URL -> 403', bad.status === 403);
-  const missing = await fetch(BASE + dl.downloadUrl);
+  const missing = await fetch(dl.downloadUrl);
   check('Valid signed URL, file absent -> 404', missing.status === 404);
   await expectCode('DeleteModel active -> FailedPrecondition', Code.FailedPrecondition, () => admin.deleteModel({ modelId: active.modelId }, SA));
   const old = models.find((m) => m.modelVersion !== pushVersion);

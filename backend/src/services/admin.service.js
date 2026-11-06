@@ -6,6 +6,7 @@ import { AdminUser } from '../../models/AdminUser.js';
 import { AuditLog } from '../../models/AuditLog.js';
 import { SystemConfig, ConfigHistory } from '../../models/SystemConfig.js';
 import { createSessionStore } from '../lib/sessions.js';
+import { storage } from '../storage.js';
 import { config as appConfig } from '../../config/index.js';
 import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
@@ -471,6 +472,7 @@ export function createAdminService({ redis }) {
       if (model.is_active) throw failedPrecondition('Cannot delete the currently active model');
 
       await model.deleteOne();
+      await storage.remove(`/models/${model.model_version}`);
       await logEvent({ actor: authOf(ctx).sub, eventType: 'model.deleted', details: { model_id: req.modelId } });
       return { deleted: true };
     },
