@@ -125,6 +125,13 @@ export const config = {
   events: {
     pingIntervalMs: int('EVENT_PING_INTERVAL_MS', 30000, { min: 100 }),
     queueMax: int('EVENT_QUEUE_MAX', 1000, { min: 1 }),
+    authRecheckMs: int('STREAM_AUTH_RECHECK_MS', 30000, { min: 100 }),
+  },
+
+  clientStatus: {
+    checkIntervalMs: int('CLIENT_STATUS_CHECK_INTERVAL_MS', 60000, { min: 100 }),
+    idleAfterMs: int('CLIENT_IDLE_AFTER_MS', 300000, { min: 100 }),
+    disconnectedAfterMs: int('CLIENT_DISCONNECTED_AFTER_MS', 1800000, { min: 100 }),
   },
 
   maintenance: {
@@ -170,6 +177,7 @@ export const config = {
 
 config.maxUpdateSizeMb = config.limits.maxUpdateSizeMb;
 
+notAbove('CLIENT_IDLE_AFTER_MS', config.clientStatus.idleAfterMs, 'CLIENT_DISCONNECTED_AFTER_MS', config.clientStatus.disconnectedAfterMs);
 notAbove('PAGE_SIZE_DEFAULT', config.limits.pageSizeDefault, 'PAGE_SIZE_MAX', config.limits.pageSizeMax);
 notAbove('METRICS_ROUNDS_DEFAULT', config.limits.metricsRoundsDefault, 'METRICS_ROUNDS_MAX', config.limits.metricsRoundsMax);
 notAbove('LOGS_LIMIT_DEFAULT', config.limits.logsLimitDefault, 'LOGS_LIMIT_MAX', config.limits.logsLimitMax);

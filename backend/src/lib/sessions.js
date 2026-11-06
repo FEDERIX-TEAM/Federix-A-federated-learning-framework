@@ -2,6 +2,7 @@ import { newId } from '../../utils/ids.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt.js';
 
 const FAMILY_PREFIX = 'session:family:';
+const SUBJECT_PREFIX = 'session:subject:';
 
 const ROTATE_SCRIPT = `
 local current = redis.call('GET', KEYS[1])
@@ -19,6 +20,7 @@ export const SESSION_ENDED = 0;
 export const REUSE_DETECTED = -1;
 
 const familyKey = (fam) => `${FAMILY_PREFIX}${fam}`;
+const subjectKey = (sub) => `${SUBJECT_PREFIX}${sub}`;
 
 function signRefresh(claims, fam) {
   const jti = newId();
@@ -32,7 +34,12 @@ export function createSessionStore(redis) {
     async start(claims) {
       const fam = newId();
       const refresh = signRefresh(claims, fam);
-      await redis.set(familyKey(fam), refresh.jti, 'EX', refresh.ttl);
+      await redis
+        .multi()
+        .set(familyKey(fam), refresh.jti, 'EX', refresh.ttl)
+        .sadd(subjectKey(claims.sub), fam)
+        .expire(subjectKey(claims.sub), refresh.ttl)
+        .exec();
       return {
         accessToken: signAccessToken({ ...claims, fam, jti: newId() }),
         refreshToken: refresh.token,
@@ -58,6 +65,13 @@ export function createSessionStore(redis) {
 
     async end(fam) {
       if (fam) await redis.del(familyKey(fam));
+    },
+
+    async endAll(sub) {
+      if (!sub) return 0;
+      const families = await redis.smembers(subjectKey(sub));
+      await redis.del(subjectKey(sub), ...families.map(familyKey));
+      return families.length;
     },
   };
 }

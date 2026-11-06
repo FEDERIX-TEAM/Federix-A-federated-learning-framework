@@ -1,10 +1,11 @@
 import { Client } from '../../models/Client.js';
-import { Round } from '../../models/Round.js';
+import { Round, RUNNING_STATUSES } from '../../models/Round.js';
 import { Update } from '../../models/Update.js';
 import { GlobalModel } from '../../models/GlobalModel.js';
 import { AdminUser } from '../../models/AdminUser.js';
 import { AuditLog } from '../../models/AuditLog.js';
 import { SystemConfig, ConfigHistory } from '../../models/SystemConfig.js';
+import { createSessionStore } from '../lib/sessions.js';
 import { config as appConfig } from '../../config/index.js';
 import { newId } from '../../utils/ids.js';
 import * as signedUrl from '../../utils/signedUrl.js';
@@ -26,6 +27,10 @@ import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 const CLIENT_SORT_FIELDS = ['created_at', 'name', 'last_seen', 'rounds_participated', 'utility_avg', 'status'];
 const ASSIGNABLE_ROLES = ['admin', 'fl_engineer', 'viewer'];
 
+const displayStatus = (c) => {
+  if (c.isBanned()) return 'banned';
+  return c.status === 'banned' ? 'idle' : c.status;
+};
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const pageArgs = (req) => {
   const limit = clampN(req.limit, appConfig.limits.pageSizeDefault, appConfig.limits.pageSizeMax);
@@ -34,7 +39,25 @@ const pageArgs = (req) => {
 };
 const metricsRounds = (req) => clampN(req.lastNRounds, appConfig.limits.metricsRoundsDefault, appConfig.limits.metricsRoundsMax);
 
-export function createAdminService() {
+export function createAdminService({ redis }) {
+  const sessions = createSessionStore(redis);
+
+  async function removeFromRunningRounds(clientId, reason) {
+    const rounds = await Round.find({
+      status: { $in: RUNNING_STATUSES },
+      participants: { $elemMatch: { client_id: clientId, status: 'joined' } },
+    }).select('round_id');
+    const now = new Date();
+    for (const r of rounds) {
+      await Round.updateOne(
+        { round_id: r.round_id },
+        { $set: { 'participants.$[p].status': 'left', 'participants.$[p].left_at': now, 'participants.$[p].leave_reason': reason } },
+        { arrayFilters: [{ 'p.client_id': clientId, 'p.status': 'joined' }] }
+      );
+      publish('round_client_left', { round_id: r.round_id, client_id: clientId, reason }, ADMIN_ROLES);
+    }
+  }
+
   return {
     // ───────────── Clients ─────────────
     async getOverview() {
@@ -58,7 +81,7 @@ export function createAdminService() {
       const { limit, skip } = pageArgs(req);
       const sortBy = CLIENT_SORT_FIELDS.includes(req.sortBy) ? req.sortBy : 'created_at';
       const filter = {};
-      if (req.status === 'banned') filter.banned_until = { $ne: null };
+      if (req.status === 'banned') filter.$or = [{ banned_until: new Date(0) }, { banned_until: { $gt: new Date() } }];
       else if (req.status) filter.status = req.status;
 
       const clients = await Client.find(filter).sort({ [sortBy]: -1 }).skip(skip).limit(limit);
@@ -66,7 +89,7 @@ export function createAdminService() {
         yield {
           clientId: c.client_id,
           name: c.name,
-          status: c.isBanned() ? 'banned' : c.status,
+          status: displayStatus(c),
           lastSeen: dateToIso(c.last_seen),
           roundsParticipated: c.rounds_participated,
           utilityAvg: num(c.utility_avg),
@@ -109,6 +132,8 @@ export function createAdminService() {
           { status: 'rejected', reason: 'client banned' }
         );
       }
+      await removeFromRunningRounds(client.client_id, 'client banned');
+      await sessions.endAll(client.client_id);
 
       await logEvent({
         actor: authOf(ctx).sub,
@@ -140,6 +165,8 @@ export function createAdminService() {
       const client = await Client.findOne({ client_id: req.clientId });
       if (!client) throw notFound('Client not found');
 
+      await removeFromRunningRounds(client.client_id, 'client deleted');
+      await sessions.endAll(client.client_id);
       const result = await Update.deleteMany({ client_id: client.client_id });
       await client.deleteOne();
       await logEvent({ actor: authOf(ctx).sub, eventType: 'client.deleted', details: { client_id: req.clientId } });
@@ -513,6 +540,7 @@ export function createAdminService() {
       }
 
       await target.deleteOne();
+      await sessions.endAll(target.user_id);
       await logEvent({ actor, eventType: 'admin.user_deleted', details: { deleted_user_id: req.userId } });
       return { deleted: true };
     },

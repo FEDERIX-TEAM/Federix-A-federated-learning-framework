@@ -28,7 +28,7 @@ export function createClientService() {
       const client = await loadClient(ctx);
       return {
         clientId: client.client_id,
-        status: client.isBanned() ? 'banned' : client.status,
+        status: client.isBanned() ? 'banned' : (client.status === 'banned' ? 'idle' : client.status),
         lastSeen: dateToIso(client.last_seen),
         roundCount: client.rounds_participated,
       };
@@ -284,6 +284,8 @@ export function createClientService() {
     async heartbeat(req, ctx) {
       if (!req.roundId) throw invalidArg('round_id is required');
       const clientId = clientIdOf(ctx);
+      const client = await loadClient(ctx);
+      if (client.isBanned()) throw permissionDenied('Client is banned from participating');
 
       // Targeted update by array index, guarded on client_id so it can never touch another participant
       // (participants are only ever appended, so indices are stable). Avoids a full-document save() racing
