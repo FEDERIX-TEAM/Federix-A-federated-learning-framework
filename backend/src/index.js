@@ -10,6 +10,7 @@ import { connectMongo, createRedisClient } from '../db.js';
 import { buildInterceptors } from './interceptors.js';
 import { registerStorageRoute } from './storage.js';
 import { startHeartbeatWatcher } from './heartbeatWatcher.js';
+import { startClientStatusWatcher } from './clientStatusWatcher.js';
 import { getActiveConfig } from './lib/helpers.js';
 import { ensureRoundIndexes } from '../models/Round.js';
 
@@ -82,15 +83,16 @@ async function main() {
     routes: (router) => {
       router.service(AuthService, createAuthService({ redis }));
       router.service(ClientService, createClientService());
-      router.service(AdminService, createAdminService());
+      router.service(AdminService, createAdminService({ redis }));
       router.service(SystemService, createSystemService({ redis }));
       router.service(FlBridgeService, createFlBridgeService());
-      router.service(EventStreamService, createEventService());
+      router.service(EventStreamService, createEventService({ redis, logger }));
     },
   });
 
   registerStorageRoute(app);
   const stopHeartbeatWatcher = startHeartbeatWatcher(logger);
+  const stopClientStatusWatcher = startClientStatusWatcher(logger);
 
   let closing = false;
   const shutdown = async (signal) => {
@@ -98,6 +100,7 @@ async function main() {
     closing = true;
     logger.info({ signal }, 'shutting down');
     stopHeartbeatWatcher();
+    stopClientStatusWatcher();
     // Long-lived Subscribe streams never end on their own; don't wait on them.
     setTimeout(() => process.exit(0), 5000).unref();
     try {

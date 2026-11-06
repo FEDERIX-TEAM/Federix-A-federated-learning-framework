@@ -102,6 +102,10 @@ and is frozen per round in `config_snapshot`.
 | `HEARTBEAT_TIMEOUT_MS` | `90000` | ≥ 100 | Silence after which a participant is dropped |
 | `EVENT_PING_INTERVAL_MS` | `30000` | ≥ 100 | Keep-alive ping on the event stream |
 | `EVENT_QUEUE_MAX` | `1000` | ≥ 1 | Queued events per slow subscriber before the oldest are dropped |
+| `STREAM_AUTH_RECHECK_MS` | `30000` | ≥ 100 | How often an open event stream re-checks its session, token, role and ban state |
+| `CLIENT_STATUS_CHECK_INTERVAL_MS` | `60000` | ≥ 100 | How often client statuses and expired bans are updated |
+| `CLIENT_IDLE_AFTER_MS` | `300000` | ≥ 100, ≤ disconnected | Silence after which an active client becomes `idle` |
+| `CLIENT_DISCONNECTED_AFTER_MS` | `1800000` | ≥ 100 | Silence after which a client becomes `disconnected` |
 | `MAINTENANCE_TTL_SECONDS` | `86400` | ≥ 1 | Maintenance mode switches itself off after this |
 | `MAX_LABEL_CLASSES` / `MAX_LABEL_KEY_LENGTH` | `1000` / `64` | ≥ 1 | Limits on a submitted label distribution |
 | `PAGE_SIZE_DEFAULT` / `PAGE_SIZE_MAX` | `20` / `200` | default ≤ max | Paging for client and round lists |
