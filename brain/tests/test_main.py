@@ -54,3 +54,17 @@ def test_cli_rejects_unknown_keys(capsys):
 def test_a_run_scores_every_update(tmp_path, small_datasets):
     result = run(small_cfg(tmp_path, rounds=2), datasets=small_datasets, log=quiet_logger(tmp_path))
     assert 0 < result["mean_utility"] <= 1
+
+
+def test_low_ratios_cut_bytes_and_still_learn(tmp_path, small_datasets):
+    start = run(small_cfg(tmp_path, rounds=0), datasets=small_datasets, log=quiet_logger(tmp_path))
+    cfg = small_cfg(tmp_path, rounds=4, clients_per_round=4, tau_high=1.0, tau_low=1.0, ratios=(1.0, 0.5, 0.1))
+    sparse = run(cfg, datasets=small_datasets, log=quiet_logger(tmp_path))
+    assert sparse["MB"] < 0.25 * sparse["dense_MB"]
+    assert sparse["loss"] < start["loss"]
+
+
+def test_compression_off_sends_dense_updates(tmp_path, small_datasets):
+    cfg = small_cfg(tmp_path, rounds=2, tau_high=1.0, tau_low=1.0, compression=False)
+    result = run(cfg, datasets=small_datasets, log=quiet_logger(tmp_path))
+    assert result["MB"] == result["dense_MB"]

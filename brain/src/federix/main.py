@@ -2,7 +2,12 @@ import argparse
 import random
 import sys
 
+import torch
 from torch.nn.utils import parameters_to_vector as flat
+
+from federix.adapters.pytorch import spec_of
+from federix.codec import DensePayload, decode, encode, encoded_size
+from federix.compression import ErrorFeedback
 
 from federix.aggregation import aggregate, sample_weights
 from federix.config import Config, ConfigError, setup_cpu
@@ -22,7 +27,11 @@ def run(cfg, datasets=None, log=None):
     clients = make_clients(train, cfg)
     model = make_model()
     w = flat(model.parameters()).detach()
+    spec = spec_of(model)
+    feedback = ErrorFeedback(enabled=cfg.error_feedback)
+    dense_bytes = encoded_size(DensePayload(w.numpy()))
     total_bytes = 0
+    total_dense_bytes = 0
     log.info(f"FedProx baseline | clients={cfg.num_clients} per_round={cfg.clients_per_round} "
              f"rounds={cfg.rounds} mu={cfg.mu} lr={cfg.lr} params={w.numel():,}")
 
@@ -44,9 +53,15 @@ def run(cfg, datasets=None, log=None):
             n = len(clients[k].train)
             u = utility(lb, la, n, label_counts(clients[k].train), cfg)
             update_tier = tier(u.score if u else None, cfg)
-            up = ClientUpdate(client_id=str(k), payload=("dense", delta), num_samples=n,
+            if update_tier.status == "rejected":
+                log.info(f"  client={k} n={n} rejected (u={u.score if u else None})")
+                continue
+            ratio = update_tier.ratio if cfg.compression else 1.0
+            blob = encode(feedback.compress(str(k), delta.numpy(), ratio), spec.digest)
+            received, _ = decode(blob, expected_digest=spec.digest, expected_length=spec.size)
+            up = ClientUpdate(client_id=str(k), payload=("fxw1", torch.from_numpy(received.to_dense())), num_samples=n,
                               loss_before=lb, loss_after=la, utility=u.score if u else 0.0,
-                              ratio=update_tier.ratio, bytes_sent=delta.numel() * 4)
+                              ratio=ratio, bytes_sent=len(blob))
             updates.append(up)
             if u:
                 scores.append(u.score)
@@ -61,13 +76,15 @@ def run(cfg, datasets=None, log=None):
         weights = sample_weights([u.num_samples for u in updates])
         w = aggregate(w, [u.payload[1] for u in updates], weights)
         total_bytes += sum(u.bytes_sent for u in updates)
+        total_dense_bytes += dense_bytes * len(updates)
         rounds_with_updates += 1
         metrics = evaluate(model, w, test, cfg.eval_batch_size)
         log.info(f"round {t + 1}/{cfg.rounds} | updated {len(updates)}/{len(chosen)} | "
                  f"acc={metrics['acc']:.4f} loss={metrics['loss']:.4f} | cum_MB={total_bytes / 1e6:.2f}")
 
     mean_utility = sum(scores) / len(scores) if scores else 0.0
-    return {**metrics, "MB": total_bytes / 1e6, "rounds_with_updates": rounds_with_updates, "mean_utility": mean_utility}
+    return {**metrics, "MB": total_bytes / 1e6, "dense_MB": total_dense_bytes / 1e6,
+            "rounds_with_updates": rounds_with_updates, "mean_utility": mean_utility}
 
 
 def parse_args(argv):

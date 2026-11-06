@@ -42,6 +42,8 @@ class Config:
     tau_low: float = 0.2
     ratios: tuple = (1.0, 0.5, 0.1)
     temperature: float = 1.0
+    compression: bool = True
+    error_feedback: bool = True
     seed: int = 0
     log_dir: str = "logs"
     log_level: str = "INFO"
