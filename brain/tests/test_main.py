@@ -15,7 +15,7 @@ def quiet_logger(tmp_path):
 
 def small_cfg(tmp_path, **kw):
     base = dict(num_clients=4, clients_per_round=2, rounds=2, local_epochs=1, batch_size=32, dirichlet_alpha=1.0,
-                min_client_samples=20, log_dir=str(tmp_path))
+                min_client_samples=20, server_holdout_size=100, log_dir=str(tmp_path))
     return Config(**{**base, **kw}).validate()
 
 

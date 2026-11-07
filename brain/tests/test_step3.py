@@ -41,10 +41,13 @@ def test_losses_are_measured_on_the_held_out_split_not_the_training_data():
 
 
 def test_aggregate():
+    import numpy as np
+
     wt = sample_weights([100, 300])
-    assert torch.allclose(wt, torch.tensor([0.25, 0.75]))
-    out = aggregate(torch.zeros(3), [torch.ones(3), 3 * torch.ones(3)], wt)
-    assert torch.allclose(out, torch.full((3,), 2.5))
+    np.testing.assert_allclose(wt, [0.25, 0.75])
+    out = aggregate(np.zeros(3, dtype=np.float32), [np.ones(3), 3 * np.ones(3)], wt)
+    np.testing.assert_allclose(out, np.full(3, 2.5))
+    assert out.dtype == np.float32
 
 
 def test_evaluate_reports_accuracy_and_loss():

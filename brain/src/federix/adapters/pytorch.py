@@ -23,3 +23,13 @@ def load_vector(model, vector):
             n = p.numel()
             p.copy_(torch.from_numpy(vector[offset:offset + n].reshape(tuple(p.shape))))
             offset += n
+
+
+def holdout_loss_fn(model, dataset, batch_size=1024):
+    from federix.fedprox import mean_loss
+
+    def loss(vector):
+        load_vector(model, vector)
+        return mean_loss(model, dataset, batch_size)
+
+    return loss
