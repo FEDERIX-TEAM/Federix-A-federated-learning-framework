@@ -53,13 +53,25 @@ def train_val_split(indices, val_fraction, rng):
     return np.sort(shuffled[n_val:]), np.sort(shuffled[:n_val])
 
 
-def make_clients(train, cfg):
+def make_clients(train, cfg, pool=None):
+    labels = train.tensors[1].numpy()
+    pool = np.arange(len(labels)) if pool is None else np.asarray(pool)
     parts = dirichlet_split(
-        train.tensors[1].numpy(), cfg.num_clients, cfg.dirichlet_alpha, cfg.min_client_samples, cfg.seed, cfg.split_max_attempts
+        labels[pool], cfg.num_clients, cfg.dirichlet_alpha, cfg.min_client_samples, cfg.seed, cfg.split_max_attempts
     )
     rng = np.random.default_rng(cfg.seed + 1)
     clients = []
     for part in parts:
-        tr, va = train_val_split(part, cfg.val_fraction, rng)
+        tr, va = train_val_split(pool[part], cfg.val_fraction, rng)
         clients.append(ClientData(train=Subset(train, tr), val=Subset(train, va)))
     return clients
+
+
+def make_clients_and_holdout(train, cfg):
+    n = len(train)
+    size = cfg.server_holdout_size if cfg.holdout_check else 0
+    if size >= n:
+        raise ValueError(f"server_holdout_size ({size}) must be smaller than the training set ({n})")
+    order = np.random.default_rng(cfg.seed + 2).permutation(n)
+    holdout = Subset(train, np.sort(order[:size])) if size else None
+    return make_clients(train, cfg, pool=np.sort(order[size:])), holdout

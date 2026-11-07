@@ -6,6 +6,8 @@ from pathlib import Path
 
 ENV_PREFIX = "FEDERIX_"
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+AGGREGATIONS = ("utility", "fedprox")
+ATTACKS = ("scale", "noise", "sign_flip")
 
 
 class ConfigError(ValueError):
@@ -44,6 +46,15 @@ class Config:
     temperature: float = 1.0
     compression: bool = True
     error_feedback: bool = True
+    aggregation: str = "utility"
+    validate_updates: bool = True
+    max_update_norm_factor: float = 5.0
+    holdout_check: bool = True
+    holdout_loss_tolerance: float = 0.5
+    server_holdout_size: int = 1000
+    attackers: int = 0
+    attack: str = "scale"
+    attack_scale: float = 20.0
     seed: int = 0
     log_dir: str = "logs"
     log_level: str = "INFO"
@@ -85,6 +96,13 @@ class Config:
             high, medium, low = self.ratios
             need(all(0 < r <= 1 for r in self.ratios), f"every ratio must be within (0, 1] (got {self.ratios})")
             need(high >= medium >= low, f"ratios must be ordered high >= medium >= low (got {self.ratios})")
+        need(self.aggregation in AGGREGATIONS, f"aggregation must be one of {', '.join(AGGREGATIONS)} (got {self.aggregation!r})")
+        need(self.attack in ATTACKS, f"attack must be one of {', '.join(ATTACKS)} (got {self.attack!r})")
+        need(self.max_update_norm_factor >= 0, f"max_update_norm_factor must be >= 0 (got {self.max_update_norm_factor})")
+        need(self.holdout_loss_tolerance >= 0, f"holdout_loss_tolerance must be >= 0 (got {self.holdout_loss_tolerance})")
+        need(self.server_holdout_size >= 0, f"server_holdout_size must be >= 0 (got {self.server_holdout_size})")
+        need(0 <= self.attackers <= self.num_clients, f"attackers must be within [0, num_clients] (got {self.attackers})")
+        need(self.attack_scale > 0, f"attack_scale must be > 0 (got {self.attack_scale})")
         need(self.log_level in LOG_LEVELS, f"log_level must be one of {', '.join(LOG_LEVELS)} (got {self.log_level!r})")
         need(bool(self.data_dir), "data_dir must not be empty")
         need(bool(self.log_dir), "log_dir must not be empty")
