@@ -10,7 +10,7 @@ dependencies = ["httpx>=0.27", "protobuf>=7.35.1,<8", "numpy>=1.26"]
 torch = ["torch>=2.2"]
 
 [dependency-groups]
-dev = ["pytest>=8", "grpcio-tools>=1.68", "torch>=2.2"]
+dev = ["pytest>=8", "grpcio-tools>=1.68", "torch>=2.2", "torchvision>=0.17"]
 
 [build-system]
 requires = ["hatchling"]
@@ -24,6 +24,7 @@ testpaths = ["tests"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

@@ -6,6 +6,9 @@ from federix_sdk.errors import Code, ConnectError
 from federix_sdk.spec import ModelSpec, ParamSpec
 from federix_sdk.credentials import Credentials, CredentialsError, CredentialStore
 from federix_sdk.heartbeat import Heartbeat
+from federix_sdk.round_client import FederixClient, ModelMismatch, RoundOutcome
+from federix_sdk.trainer import RoundConfig, Trainer, TrainResult
+from federix_sdk.transfer import TransferError, Transfers
 from federix_sdk.session import CredentialsRejected, EnrollmentRequired, Session
 from federix_sdk.settings import ClientSettings, SettingsError
 from federix_sdk.transport import Transport
@@ -14,6 +17,14 @@ from federix_sdk.version import SDK_VERSION
 __version__ = SDK_VERSION
 
 __all__ = [
+    "FederixClient",
+    "ModelMismatch",
+    "RoundConfig",
+    "RoundOutcome",
+    "Trainer",
+    "TrainResult",
+    "TransferError",
+    "Transfers",
     "ClientSettings",
     "Credentials",
     "CredentialsError",
