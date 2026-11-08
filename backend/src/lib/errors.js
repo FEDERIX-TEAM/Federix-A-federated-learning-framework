@@ -9,3 +9,9 @@ export const unauthenticated = (msg) => new ConnectError(msg, Code.Unauthenticat
 export const unavailable = (msg) => new ConnectError(msg, Code.Unavailable);
 export const resourceExhausted = (msg) => new ConnectError(msg, Code.ResourceExhausted);
 export const notImplementedYet = (rpc) => new ConnectError(`${rpc} is part of protocol v1.1 and is not available on this server yet`, Code.Unimplemented);
+
+export function throwIfDeadlineExceeded(signal) {
+  if (signal.aborted && signal.reason instanceof ConnectError && signal.reason.code === Code.DeadlineExceeded) {
+    throw signal.reason;
+  }
+}
