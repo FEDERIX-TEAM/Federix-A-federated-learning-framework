@@ -34,6 +34,44 @@ and `headers=`. The FL server passes `internal_token=` instead of an access toke
 Errors are `ConnectError` with a `Code`: server errors keep the server's code and message, a timeout is
 `DEADLINE_EXCEEDED`, a server that cannot be reached is `UNAVAILABLE`, and an unknown RPC is `UNIMPLEMENTED`.
 
+## Running as a client
+```python
+from federix_sdk import ClientSettings, Heartbeat, Session
+
+settings = ClientSettings.load(server_url="https://fl.example.com", enrollment_token="fdx_enroll_...")
+with Session(settings) as session:                 # enrolls once, then logs in with the saved API key
+    status = session.api.client.get_status()
+    session.api.client.join_round(round_id=rid, local_data_size=5000)
+    with Heartbeat(session, rid):                  # background heartbeats until the block ends
+        ...
+```
+- **Enrollment:** the first start registers with the enrollment token an admin gave you and saves `client_id` and
+  `api_key` to `~/.federix/credentials.json` (one entry per server, file `0600`, folder `0700`, written atomically).
+  Later starts reuse it; the token is not needed again. A credentials file other users can read is refused.
+- **Tokens:** access tokens are refreshed shortly before they expire (`refresh_margin`), and a call that comes back
+  `UNAUTHENTICATED` is refreshed and retried once. If the session ended (logout elsewhere, a flushed cache), the SDK
+  logs in again with the API key. Only one thread refreshes at a time, so concurrent calls never look like a reused
+  refresh token to the server.
+- **Errors you may need to handle:** `EnrollmentRequired` (no token and the server requires one),
+  `CredentialsRejected` (the API key was rotated or the client deleted: remove its entry and enroll again), and
+  `ConnectError` with `Code.PERMISSION_DENIED` when the client is banned.
+- **Heartbeat:** `Heartbeat` beats once immediately and then every `heartbeat_interval` seconds on a daemon thread,
+  counts `sent` and `failures`, and stops itself when the server refuses it (for example after a ban).
+
+### Settings
+`ClientSettings.load(**overrides)` reads `FEDERIX_SDK_<SETTING>` environment variables, then the arguments you
+pass; values are validated and unknown names are refused.
+
+| Setting | Default | What it controls |
+|---|---|---|
+| `server_url` | `http://127.0.0.1:4000` | Central server address |
+| `credentials_path` | `~/.federix/credentials.json` | Where the client identity is kept |
+| `client_name` / `platform` | `federix-client` / detected | Reported when enrolling |
+| `enrollment_token` | empty | Needed only for the first start |
+| `request_timeout` / `connect_timeout` | 30 / 10 | Seconds per call / to connect |
+| `heartbeat_interval` | 20 | Seconds between heartbeats (the server drops a participant after `HEARTBEAT_TIMEOUT_MS`) |
+| `refresh_margin` | 30 | Refresh the access token when it has less than this many seconds left |
+
 ## Model weights
 Weights travel as a flat float32 vector plus a `ModelSpec` (ordered `(name, shape, dtype)` with a sha256), encoded
 with `encode`/`decode` in the FXW1 format and compressed with top-k (`compress`, `ErrorFeedback`). The format and
