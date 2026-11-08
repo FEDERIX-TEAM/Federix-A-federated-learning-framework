@@ -38,6 +38,8 @@ export const RBAC_RULES = {
   'FlBridgeService.WatchRounds': 'internal',
   'FlBridgeService.GetModelUploadUrl': 'internal',
   'FlBridgeService.ReportFlStatus': 'internal',
+  'FlBridgeService.GetModelDownloadUrl': 'internal',
+  'FlBridgeService.FailRound': 'internal',
 
   // AdminService
   'AdminService.GetOverview': ['super_admin', 'admin', 'fl_engineer', 'viewer'],
@@ -96,6 +98,8 @@ const FL_ALLOWED_DURING_MAINTENANCE = new Set([
   'GetFlStatus',
   'ReportFlStatus',
   'WatchRounds',
+  'GetModelDownloadUrl',
+  'FailRound',
 ]);
 
 export function isMaintenanceGated(serviceName, methodName) {

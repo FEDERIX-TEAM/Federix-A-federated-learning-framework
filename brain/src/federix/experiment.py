@@ -82,7 +82,7 @@ def run_experiment(variants, seeds, base_overrides, out_dir, config_path=None, d
     first = next(iter(configs.values()))
     data = datasets if datasets is not None else load_mnist(first.data_dir)
     (out / "config.json").write_text(json.dumps(
-        {f"{v}/seed={s}": cfg.as_dict() for (v, s), cfg in configs.items()}, indent=2, default=list))
+        {f"{v}/seed={s}": cfg.as_dict(redact=True) for (v, s), cfg in configs.items()}, indent=2, default=list))
 
     summaries = []
     with (out / "rounds.csv").open("w", newline="") as fh:

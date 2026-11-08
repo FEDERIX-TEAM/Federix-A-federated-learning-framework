@@ -25,13 +25,17 @@ _sym_db = _symbol_database.Default()
 from . import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x66l_bridge.proto\x12\nfederix.v1\x1a\x0c\x63ommon.proto\";\n\x13TriggerRoundRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x12\n\nupdate_ids\x18\x02 \x03(\t\"G\n\x14TriggerRoundResponse\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x1d\n\x15\x65stimated_duration_ms\x18\x02 \x01(\x05\"<\n\x0cModelMetrics\x12\x13\n\x0bglobal_loss\x18\x01 \x01(\x01\x12\x17\n\x0fglobal_accuracy\x18\x02 \x01(\x01\"\x9d\x01\n\x14\x43ompleteRoundRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x19\n\x11new_model_version\x18\x02 \x01(\x05\x12\x11\n\tmodel_url\x18\x03 \x01(\t\x12\x13\n\x0bglobal_loss\x18\x04 \x01(\x01\x12\x17\n\x0fglobal_accuracy\x18\x05 \x01(\x01\x12\x17\n\x0fused_update_ids\x18\x06 \x03(\t\"X\n\x15\x43ompleteRoundResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x1c\n\x14next_round_scheduled\x18\x02 \x01(\x08\x12\x10\n\x08model_id\x18\x03 \x01(\t\"\'\n\x13RoundUpdatesRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\"\xa6\x02\n\x10RoundUpdateEntry\x12\x11\n\tupdate_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x14\n\x0c\x64ownload_url\x18\x03 \x01(\t\x12\x15\n\rutility_score\x18\x04 \x01(\x01\x12\x39\n\x12label_distribution\x18\x05 \x01(\x0b\x32\x1d.federix.v1.LabelDistribution\x12\x0e\n\x06sha256\x18\x06 \x01(\t\x12\r\n\x05\x62ytes\x18\x07 \x01(\x03\x12\x19\n\x11\x63ompression_ratio\x18\x08 \x01(\x01\x12\x11\n\tdata_size\x18\t \x01(\x05\x12\x37\n\x11\x63ompression_level\x18\n \x01(\x0e\x32\x1c.federix.v1.CompressionLevel\"\x8d\x01\n\x10PushModelRequest\x12\x15\n\x08round_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x12\x15\n\rmodel_version\x18\x02 \x01(\x05\x12\x13\n\x0bweights_url\x18\x03 \x01(\t\x12)\n\x07metrics\x18\x04 \x01(\x0b\x32\x18.federix.v1.ModelMetricsB\x0b\n\t_round_id\"5\n\x11PushModelResponse\x12\x0e\n\x06stored\x18\x01 \x01(\x08\x12\x10\n\x08model_id\x18\x02 \x01(\t\"]\n\x10\x46lStatusResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x15\n\rlast_round_id\x18\x03 \x01(\t\x12\x11\n\tuptime_ms\x18\x04 \x01(\x03\"=\n\x15\x43omputeUtilityRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x12\n\nupdate_ids\x18\x02 \x03(\t\"r\n\rUtilityResult\x12\x11\n\tupdate_id\x18\x01 \x01(\t\x12\x15\n\rutility_score\x18\x02 \x01(\x01\x12\x37\n\x11\x63ompression_level\x18\x03 \x01(\x0e\x32\x1c.federix.v1.CompressionLevel\"\xf8\x01\n\x10\x46lConfigResponse\x12\n\n\x02mu\x18\x01 \x01(\x01\x12\x1e\n\x16utility_threshold_high\x18\x02 \x01(\x01\x12\x1d\n\x15utility_threshold_low\x18\x03 \x01(\x01\x12\x19\n\x11\x63ompression_ratio\x18\x04 \x01(\x01\x12\x13\n\x0bmin_clients\x18\x05 \x01(\x05\x12\x14\n\x0clocal_epochs\x18\x06 \x01(\x05\x12\x12\n\nbatch_size\x18\x07 \x01(\x05\x12*\n\x07utility\x18\x08 \x01(\x0b\x32\x19.federix.v1.UtilityConfig\x12\x13\n\x0bmax_clients\x18\t \x01(\x05\"\'\n\x12WatchRoundsRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\"\xad\x01\n\x0fRoundReadyEvent\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x14\n\x0cround_number\x18\x02 \x01(\x05\x12,\n\x06reason\x18\x03 \x01(\x0e\x32\x1c.federix.v1.RoundReadyReason\x12\x14\n\x0cupdate_count\x18\x04 \x01(\x05\x12\x1c\n\x14model_version_before\x18\x05 \x01(\x05\x12\x10\n\x08ready_at\x18\x06 \x01(\t\".\n\x15ModelUploadUrlRequest\x12\x15\n\rmodel_version\x18\x01 \x01(\x05\"V\n\x16ModelUploadUrlResponse\x12%\n\x06upload\x18\x01 \x01(\x0b\x32\x15.federix.v1.SignedUrl\x12\x15\n\rresource_path\x18\x02 \x01(\t\"\x9d\x01\n\x0e\x46lStatusReport\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12(\n\x05state\x18\x02 \x01(\x0e\x32\x19.federix.v1.FlServerState\x12\x18\n\x10\x63urrent_round_id\x18\x03 \x01(\t\x12\x0f\n\x07version\x18\x04 \x01(\t\x12\x0f\n\x07message\x18\x05 \x01(\t\x12\x12\n\nlast_error\x18\x06 \x01(\t\":\n\x11\x46lStatusReportAck\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x13\n\x0bserver_time\x18\x02 \x01(\t2\xa1\x06\n\x0f\x46lBridgeService\x12Q\n\x0cTriggerRound\x12\x1f.federix.v1.TriggerRoundRequest\x1a .federix.v1.TriggerRoundResponse\x12T\n\rCompleteRound\x12 .federix.v1.CompleteRoundRequest\x1a!.federix.v1.CompleteRoundResponse\x12R\n\x0fGetRoundUpdates\x12\x1f.federix.v1.RoundUpdatesRequest\x1a\x1c.federix.v1.RoundUpdateEntry0\x01\x12H\n\tPushModel\x12\x1c.federix.v1.PushModelRequest\x1a\x1d.federix.v1.PushModelResponse\x12>\n\x0bGetFlStatus\x12\x11.federix.v1.Empty\x1a\x1c.federix.v1.FlStatusResponse\x12P\n\x0e\x43omputeUtility\x12!.federix.v1.ComputeUtilityRequest\x1a\x19.federix.v1.UtilityResult0\x01\x12>\n\x0bGetFlConfig\x12\x11.federix.v1.Empty\x1a\x1c.federix.v1.FlConfigResponse\x12L\n\x0bWatchRounds\x12\x1e.federix.v1.WatchRoundsRequest\x1a\x1b.federix.v1.RoundReadyEvent0\x01\x12Z\n\x11GetModelUploadUrl\x12!.federix.v1.ModelUploadUrlRequest\x1a\".federix.v1.ModelUploadUrlResponse\x12K\n\x0eReportFlStatus\x12\x1a.federix.v1.FlStatusReport\x1a\x1d.federix.v1.FlStatusReportAckb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x66l_bridge.proto\x12\nfederix.v1\x1a\x0c\x63ommon.proto\";\n\x13TriggerRoundRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x12\n\nupdate_ids\x18\x02 \x03(\t\"G\n\x14TriggerRoundResponse\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x1d\n\x15\x65stimated_duration_ms\x18\x02 \x01(\x05\"<\n\x0cModelMetrics\x12\x13\n\x0bglobal_loss\x18\x01 \x01(\x01\x12\x17\n\x0fglobal_accuracy\x18\x02 \x01(\x01\"\xa9\x02\n\x14\x43ompleteRoundRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x19\n\x11new_model_version\x18\x02 \x01(\x05\x12\x11\n\tmodel_url\x18\x03 \x01(\t\x12\x13\n\x0bglobal_loss\x18\x04 \x01(\x01\x12\x17\n\x0fglobal_accuracy\x18\x05 \x01(\x01\x12\x17\n\x0fused_update_ids\x18\x06 \x03(\t\x12Q\n\x11rejection_reasons\x18\x07 \x03(\x0b\x32\x36.federix.v1.CompleteRoundRequest.RejectionReasonsEntry\x1a\x37\n\x15RejectionReasonsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"X\n\x15\x43ompleteRoundResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x1c\n\x14next_round_scheduled\x18\x02 \x01(\x08\x12\x10\n\x08model_id\x18\x03 \x01(\t\"\'\n\x13RoundUpdatesRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\"\xa6\x02\n\x10RoundUpdateEntry\x12\x11\n\tupdate_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x14\n\x0c\x64ownload_url\x18\x03 \x01(\t\x12\x15\n\rutility_score\x18\x04 \x01(\x01\x12\x39\n\x12label_distribution\x18\x05 \x01(\x0b\x32\x1d.federix.v1.LabelDistribution\x12\x0e\n\x06sha256\x18\x06 \x01(\t\x12\r\n\x05\x62ytes\x18\x07 \x01(\x03\x12\x19\n\x11\x63ompression_ratio\x18\x08 \x01(\x01\x12\x11\n\tdata_size\x18\t \x01(\x05\x12\x37\n\x11\x63ompression_level\x18\n \x01(\x0e\x32\x1c.federix.v1.CompressionLevel\"\x8d\x01\n\x10PushModelRequest\x12\x15\n\x08round_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x12\x15\n\rmodel_version\x18\x02 \x01(\x05\x12\x13\n\x0bweights_url\x18\x03 \x01(\t\x12)\n\x07metrics\x18\x04 \x01(\x0b\x32\x18.federix.v1.ModelMetricsB\x0b\n\t_round_id\"5\n\x11PushModelResponse\x12\x0e\n\x06stored\x18\x01 \x01(\x08\x12\x10\n\x08model_id\x18\x02 \x01(\t\"]\n\x10\x46lStatusResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x15\n\rlast_round_id\x18\x03 \x01(\t\x12\x11\n\tuptime_ms\x18\x04 \x01(\x03\"=\n\x15\x43omputeUtilityRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x12\n\nupdate_ids\x18\x02 \x03(\t\"r\n\rUtilityResult\x12\x11\n\tupdate_id\x18\x01 \x01(\t\x12\x15\n\rutility_score\x18\x02 \x01(\x01\x12\x37\n\x11\x63ompression_level\x18\x03 \x01(\x0e\x32\x1c.federix.v1.CompressionLevel\"\xf8\x01\n\x10\x46lConfigResponse\x12\n\n\x02mu\x18\x01 \x01(\x01\x12\x1e\n\x16utility_threshold_high\x18\x02 \x01(\x01\x12\x1d\n\x15utility_threshold_low\x18\x03 \x01(\x01\x12\x19\n\x11\x63ompression_ratio\x18\x04 \x01(\x01\x12\x13\n\x0bmin_clients\x18\x05 \x01(\x05\x12\x14\n\x0clocal_epochs\x18\x06 \x01(\x05\x12\x12\n\nbatch_size\x18\x07 \x01(\x05\x12*\n\x07utility\x18\x08 \x01(\x0b\x32\x19.federix.v1.UtilityConfig\x12\x13\n\x0bmax_clients\x18\t \x01(\x05\"\'\n\x12WatchRoundsRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\"\xad\x01\n\x0fRoundReadyEvent\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x14\n\x0cround_number\x18\x02 \x01(\x05\x12,\n\x06reason\x18\x03 \x01(\x0e\x32\x1c.federix.v1.RoundReadyReason\x12\x14\n\x0cupdate_count\x18\x04 \x01(\x05\x12\x1c\n\x14model_version_before\x18\x05 \x01(\x05\x12\x10\n\x08ready_at\x18\x06 \x01(\t\".\n\x15ModelUploadUrlRequest\x12\x15\n\rmodel_version\x18\x01 \x01(\x05\"V\n\x16ModelUploadUrlResponse\x12%\n\x06upload\x18\x01 \x01(\x0b\x32\x15.federix.v1.SignedUrl\x12\x15\n\rresource_path\x18\x02 \x01(\t\"\x9d\x01\n\x0e\x46lStatusReport\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12(\n\x05state\x18\x02 \x01(\x0e\x32\x19.federix.v1.FlServerState\x12\x18\n\x10\x63urrent_round_id\x18\x03 \x01(\t\x12\x0f\n\x07version\x18\x04 \x01(\t\x12\x0f\n\x07message\x18\x05 \x01(\t\x12\x12\n\nlast_error\x18\x06 \x01(\t\":\n\x11\x46lStatusReportAck\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x13\n\x0bserver_time\x18\x02 \x01(\t\"G\n\x17ModelDownloadUrlRequest\x12\x1a\n\rmodel_version\x18\x01 \x01(\x05H\x00\x88\x01\x01\x42\x10\n\x0e_model_version\"\xa8\x01\n\x18ModelDownloadUrlResponse\x12\x14\n\x0c\x64ownload_url\x18\x01 \x01(\t\x12\x15\n\rmodel_version\x18\x02 \x01(\x05\x12\x0e\n\x06sha256\x18\x03 \x01(\t\x12\x12\n\nsize_bytes\x18\x04 \x01(\x03\x12\x12\n\nexpires_at\x18\x05 \x01(\t\x12\x15\n\rrefresh_until\x18\x06 \x01(\t\x12\x10\n\x08round_id\x18\x07 \x01(\t\"\xbc\x01\n\x10\x46\x61ilRoundRequest\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t\x12M\n\x11rejection_reasons\x18\x03 \x03(\x0b\x32\x32.federix.v1.FailRoundRequest.RejectionReasonsEntry\x1a\x37\n\x15RejectionReasonsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"#\n\x11\x46\x61ilRoundResponse\x12\x0e\n\x06\x66\x61iled\x18\x01 \x01(\x08\x32\xcd\x07\n\x0f\x46lBridgeService\x12Q\n\x0cTriggerRound\x12\x1f.federix.v1.TriggerRoundRequest\x1a .federix.v1.TriggerRoundResponse\x12T\n\rCompleteRound\x12 .federix.v1.CompleteRoundRequest\x1a!.federix.v1.CompleteRoundResponse\x12R\n\x0fGetRoundUpdates\x12\x1f.federix.v1.RoundUpdatesRequest\x1a\x1c.federix.v1.RoundUpdateEntry0\x01\x12H\n\tPushModel\x12\x1c.federix.v1.PushModelRequest\x1a\x1d.federix.v1.PushModelResponse\x12>\n\x0bGetFlStatus\x12\x11.federix.v1.Empty\x1a\x1c.federix.v1.FlStatusResponse\x12P\n\x0e\x43omputeUtility\x12!.federix.v1.ComputeUtilityRequest\x1a\x19.federix.v1.UtilityResult0\x01\x12>\n\x0bGetFlConfig\x12\x11.federix.v1.Empty\x1a\x1c.federix.v1.FlConfigResponse\x12L\n\x0bWatchRounds\x12\x1e.federix.v1.WatchRoundsRequest\x1a\x1b.federix.v1.RoundReadyEvent0\x01\x12Z\n\x11GetModelUploadUrl\x12!.federix.v1.ModelUploadUrlRequest\x1a\".federix.v1.ModelUploadUrlResponse\x12K\n\x0eReportFlStatus\x12\x1a.federix.v1.FlStatusReport\x1a\x1d.federix.v1.FlStatusReportAck\x12`\n\x13GetModelDownloadUrl\x12#.federix.v1.ModelDownloadUrlRequest\x1a$.federix.v1.ModelDownloadUrlResponse\x12H\n\tFailRound\x12\x1c.federix.v1.FailRoundRequest\x1a\x1d.federix.v1.FailRoundResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'fl_bridge_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
+  _globals['_COMPLETEROUNDREQUEST_REJECTIONREASONSENTRY']._loaded_options = None
+  _globals['_COMPLETEROUNDREQUEST_REJECTIONREASONSENTRY']._serialized_options = b'8\001'
+  _globals['_FAILROUNDREQUEST_REJECTIONREASONSENTRY']._loaded_options = None
+  _globals['_FAILROUNDREQUEST_REJECTIONREASONSENTRY']._serialized_options = b'8\001'
   _globals['_TRIGGERROUNDREQUEST']._serialized_start=45
   _globals['_TRIGGERROUNDREQUEST']._serialized_end=104
   _globals['_TRIGGERROUNDRESPONSE']._serialized_start=106
@@ -39,37 +43,49 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_MODELMETRICS']._serialized_start=179
   _globals['_MODELMETRICS']._serialized_end=239
   _globals['_COMPLETEROUNDREQUEST']._serialized_start=242
-  _globals['_COMPLETEROUNDREQUEST']._serialized_end=399
-  _globals['_COMPLETEROUNDRESPONSE']._serialized_start=401
-  _globals['_COMPLETEROUNDRESPONSE']._serialized_end=489
-  _globals['_ROUNDUPDATESREQUEST']._serialized_start=491
-  _globals['_ROUNDUPDATESREQUEST']._serialized_end=530
-  _globals['_ROUNDUPDATEENTRY']._serialized_start=533
-  _globals['_ROUNDUPDATEENTRY']._serialized_end=827
-  _globals['_PUSHMODELREQUEST']._serialized_start=830
-  _globals['_PUSHMODELREQUEST']._serialized_end=971
-  _globals['_PUSHMODELRESPONSE']._serialized_start=973
-  _globals['_PUSHMODELRESPONSE']._serialized_end=1026
-  _globals['_FLSTATUSRESPONSE']._serialized_start=1028
-  _globals['_FLSTATUSRESPONSE']._serialized_end=1121
-  _globals['_COMPUTEUTILITYREQUEST']._serialized_start=1123
-  _globals['_COMPUTEUTILITYREQUEST']._serialized_end=1184
-  _globals['_UTILITYRESULT']._serialized_start=1186
-  _globals['_UTILITYRESULT']._serialized_end=1300
-  _globals['_FLCONFIGRESPONSE']._serialized_start=1303
-  _globals['_FLCONFIGRESPONSE']._serialized_end=1551
-  _globals['_WATCHROUNDSREQUEST']._serialized_start=1553
-  _globals['_WATCHROUNDSREQUEST']._serialized_end=1592
-  _globals['_ROUNDREADYEVENT']._serialized_start=1595
-  _globals['_ROUNDREADYEVENT']._serialized_end=1768
-  _globals['_MODELUPLOADURLREQUEST']._serialized_start=1770
-  _globals['_MODELUPLOADURLREQUEST']._serialized_end=1816
-  _globals['_MODELUPLOADURLRESPONSE']._serialized_start=1818
-  _globals['_MODELUPLOADURLRESPONSE']._serialized_end=1904
-  _globals['_FLSTATUSREPORT']._serialized_start=1907
-  _globals['_FLSTATUSREPORT']._serialized_end=2064
-  _globals['_FLSTATUSREPORTACK']._serialized_start=2066
-  _globals['_FLSTATUSREPORTACK']._serialized_end=2124
-  _globals['_FLBRIDGESERVICE']._serialized_start=2127
-  _globals['_FLBRIDGESERVICE']._serialized_end=2928
+  _globals['_COMPLETEROUNDREQUEST']._serialized_end=539
+  _globals['_COMPLETEROUNDREQUEST_REJECTIONREASONSENTRY']._serialized_start=484
+  _globals['_COMPLETEROUNDREQUEST_REJECTIONREASONSENTRY']._serialized_end=539
+  _globals['_COMPLETEROUNDRESPONSE']._serialized_start=541
+  _globals['_COMPLETEROUNDRESPONSE']._serialized_end=629
+  _globals['_ROUNDUPDATESREQUEST']._serialized_start=631
+  _globals['_ROUNDUPDATESREQUEST']._serialized_end=670
+  _globals['_ROUNDUPDATEENTRY']._serialized_start=673
+  _globals['_ROUNDUPDATEENTRY']._serialized_end=967
+  _globals['_PUSHMODELREQUEST']._serialized_start=970
+  _globals['_PUSHMODELREQUEST']._serialized_end=1111
+  _globals['_PUSHMODELRESPONSE']._serialized_start=1113
+  _globals['_PUSHMODELRESPONSE']._serialized_end=1166
+  _globals['_FLSTATUSRESPONSE']._serialized_start=1168
+  _globals['_FLSTATUSRESPONSE']._serialized_end=1261
+  _globals['_COMPUTEUTILITYREQUEST']._serialized_start=1263
+  _globals['_COMPUTEUTILITYREQUEST']._serialized_end=1324
+  _globals['_UTILITYRESULT']._serialized_start=1326
+  _globals['_UTILITYRESULT']._serialized_end=1440
+  _globals['_FLCONFIGRESPONSE']._serialized_start=1443
+  _globals['_FLCONFIGRESPONSE']._serialized_end=1691
+  _globals['_WATCHROUNDSREQUEST']._serialized_start=1693
+  _globals['_WATCHROUNDSREQUEST']._serialized_end=1732
+  _globals['_ROUNDREADYEVENT']._serialized_start=1735
+  _globals['_ROUNDREADYEVENT']._serialized_end=1908
+  _globals['_MODELUPLOADURLREQUEST']._serialized_start=1910
+  _globals['_MODELUPLOADURLREQUEST']._serialized_end=1956
+  _globals['_MODELUPLOADURLRESPONSE']._serialized_start=1958
+  _globals['_MODELUPLOADURLRESPONSE']._serialized_end=2044
+  _globals['_FLSTATUSREPORT']._serialized_start=2047
+  _globals['_FLSTATUSREPORT']._serialized_end=2204
+  _globals['_FLSTATUSREPORTACK']._serialized_start=2206
+  _globals['_FLSTATUSREPORTACK']._serialized_end=2264
+  _globals['_MODELDOWNLOADURLREQUEST']._serialized_start=2266
+  _globals['_MODELDOWNLOADURLREQUEST']._serialized_end=2337
+  _globals['_MODELDOWNLOADURLRESPONSE']._serialized_start=2340
+  _globals['_MODELDOWNLOADURLRESPONSE']._serialized_end=2508
+  _globals['_FAILROUNDREQUEST']._serialized_start=2511
+  _globals['_FAILROUNDREQUEST']._serialized_end=2699
+  _globals['_FAILROUNDREQUEST_REJECTIONREASONSENTRY']._serialized_start=484
+  _globals['_FAILROUNDREQUEST_REJECTIONREASONSENTRY']._serialized_end=539
+  _globals['_FAILROUNDRESPONSE']._serialized_start=2701
+  _globals['_FAILROUNDRESPONSE']._serialized_end=2736
+  _globals['_FLBRIDGESERVICE']._serialized_start=2739
+  _globals['_FLBRIDGESERVICE']._serialized_end=3712
 # @@protoc_insertion_point(module_scope)

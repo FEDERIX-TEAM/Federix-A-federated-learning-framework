@@ -167,3 +167,7 @@ The generated files in `src/federix_sdk/_gen` are committed.
 The tests start the real backend (`node backend/src/index.js`) with a throwaway MongoDB database and Redis DB 15,
 so MongoDB and Redis must be running (`cd backend && docker compose up -d mongo redis`). Override the addresses with
 `FEDERIX_TEST_MONGO` and `FEDERIX_TEST_REDIS`.
+
+`federix_sdk.testing.start_backend(extra_env, db_prefix)` is the harness behind these tests: it seeds an admin,
+starts the backend on a free port and removes its database and storage afterwards. The brain's FL server tests
+use it too.

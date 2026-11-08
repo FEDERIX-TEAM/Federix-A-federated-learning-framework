@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Utility-aware, communication-efficient federated learning on FedProx (CPU-only)"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["numpy", "torch", "torchvision"]
+dependencies = ["numpy", "torch", "torchvision", "federix-sdk"]
+
+[project.scripts]
+federix-server = "federix.fl_server:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -17,6 +20,7 @@ packages = ["src/federix"]
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
 torchvision = { index = "pytorch-cpu" }
+federix-sdk = { path = "../sdk", editable = true }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

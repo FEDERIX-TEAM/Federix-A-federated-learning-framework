@@ -1,12 +1,34 @@
 # Federix brain (CPU-only)
 
 Utility-aware, communication-efficient federated learning built on FedProx. This package is the research
-engine: it runs offline experiments on MNIST and will become the FL server that talks to the central server.
+engine (offline experiments on MNIST) and the FL server that aggregates real rounds for the central server.
 
 ## Setup
     uv sync
     uv run pytest
     uv run python -m federix.check_setup
+
+## Run the FL server
+    FEDERIX_INTERNAL_TOKEN=<backend INTERNAL_SERVICE_TOKEN> uv run federix-server
+    uv run python -m federix.fl_server --set backend_url=http://127.0.0.1:4000 --max-rounds 3
+
+The FL server only talks to the backend and listens on no port; nothing calls it. It:
+
+1. reports `STARTING`, downloads the active global model (`GetModelDownloadUrl`) and checks that its model spec
+   matches `model.py`, stopping with a clear error if not; with no model yet it pushes its freshly initialised
+   model as v1 (`PushModel`);
+2. keeps a `WatchRounds` stream open and reconnects with backoff (`reconnect_delay` up to `reconnect_max_delay`)
+   when it drops; on reconnect the backend replays ready rounds and aggregations in progress, so a restart
+   resumes where it stopped;
+3. for each ready round: `TriggerRound`, downloads every update (sha256-checked, FXW1-decoded against the
+   model spec), runs the server checks (norm and holdout, see `validate_updates`), aggregates with utility weights,
+   evaluates on the server test set, uploads the new model and calls `CompleteRound` with the updates it used and
+   the reason for each one it left out. If no update survives it calls `FailRound` with the reasons;
+4. reports `IDLE`, `AGGREGATING` or `ERROR` with `ReportFlStatus` on every change and every `status_interval`
+   seconds, which the dashboard shows. SIGTERM/SIGINT stop it cleanly.
+
+The server holdout (`server_holdout_size`) and evaluation set (`eval_size`, 0 = all) come from the MNIST test
+split, so the server never needs client data.
 
 ## Run the FedProx baseline
     uv run python -m federix.main                          # defaults
@@ -57,16 +79,23 @@ Unknown setting names are refused. Defaults match the central server's `SystemCo
 | `attackers` / `attack` / `attack_scale` | 0 / scale / 20.0 | Simulated malicious clients for experiments (`scale`, `sign_flip`, `noise`); they also lie about their losses |
 | `num_threads` / `eval_batch_size` / `seed` | 4 / 1024 / 0 | Runtime and reproducibility |
 | `data_dir` / `log_dir` / `log_level` | data / logs / INFO | Paths and logging |
+| `backend_url` / `internal_token` / `worker_id` | http://127.0.0.1:4000 / empty / brain-1 | FL server: where the backend is, its `INTERNAL_SERVICE_TOKEN` (required, never logged), the name shown on the dashboard |
+| `request_timeout` / `watch_timeout` | 30 / 120 | FL server: seconds per call; the round stream is reopened after this many seconds (keep it above the backend's `WATCH_KEEPALIVE_MS`) |
+| `reconnect_delay` / `reconnect_max_delay` / `status_interval` | 1 / 30 / 30 | FL server: backoff when the backend is unreachable, and how often status is reported |
+| `transfer_retries` / `eval_size` | 5 / 0 | FL server: retries for a dropped download/upload; evaluation set size (0 = whole test set minus the holdout) |
 
 ## Layout
     src/federix/   config.py  data.py  model.py  fedprox.py  aggregation.py  evaluation.py
-                   utility.py  compression.py  codec.py  spec.py  interfaces.py  logger.py
-                   main.py  check_setup.py  inspect_data.py
+                   utility.py  validation.py  interfaces.py  logger.py
+                   main.py  experiment.py  fl_server.py  check_setup.py  inspect_data.py
     src/federix/adapters/pytorch.py   the only framework-specific code: model <-> vector + spec
-    tests/         pytest suite (runs on in-memory data, no download needed)
+    tests/         pytest suite; test_fl_server.py runs the real backend (MongoDB and Redis must be running:
+                   `cd backend && docker compose up -d mongo redis`) with real MNIST and SDK clients
 
 ## Framework-neutral weights
 Utility, compression, the codec and the model spec use only Python and NumPy, so any training framework can
 produce and consume updates. A model travels as a flat float32 vector plus a `ModelSpec` (ordered
-`(name, shape, dtype)` with a sha256), encoded in the FXW1 format (`codec.py`, see `spec/codec_vectors.json`).
+`(name, shape, dtype)` with a sha256), encoded in the FXW1 format. The codec, compression and model spec come
+from the SDK (`federix_sdk.codec`, `.compression`, `.spec`, see `spec/codec_vectors.json`), so the brain and the
+clients can never disagree on the format.
 Only `adapters/` knows about a framework; PyTorch is the first adapter.

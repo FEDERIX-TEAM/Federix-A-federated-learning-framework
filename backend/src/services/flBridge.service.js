@@ -38,6 +38,22 @@ async function assertNewVersion(version) {
   }
 }
 
+function rejectionsOf(req, usableIds) {
+  const reasons = Object.entries(req.rejectionReasons ?? {});
+  const unknown = reasons.map(([id]) => id).filter((id) => !usableIds.has(id));
+  if (unknown.length) throw invalidArg(`rejection_reasons names updates that are not usable in this round: ${unknown.join(', ')}`);
+  const used = new Set(req.usedUpdateIds ?? []);
+  const overlap = reasons.map(([id]) => id).filter((id) => used.has(id));
+  if (overlap.length) throw invalidArg(`updates cannot be both used and rejected: ${overlap.join(', ')}`);
+  return reasons.map(([id, reason]) => [id, String(reason || 'rejected by the FL server').slice(0, 500)]);
+}
+
+async function applyRejections(roundId, rejections) {
+  for (const [id, reason] of rejections) {
+    await Update.updateOne({ round_id: roundId, update_id: id, status: { $in: ['accepted', 'compressed'] } }, { $set: { status: 'rejected', reason } });
+  }
+}
+
 async function activateNewModel(fields) {
   await assertNewVersion(fields.model_version);
   await GlobalModel.updateMany({}, { is_active: false });
@@ -88,6 +104,7 @@ export function createFlBridgeService({ scheduler } = {}) {
       const used = req.usedUpdateIds ?? [];
       const unknown = used.filter((id) => !usableIds.has(id));
       if (unknown.length) throw invalidArg(`used_update_ids contains updates that are not usable in this round: ${unknown.join(', ')}`);
+      const rejections = rejectionsOf(req, usableIds);
 
       const file = await storedModelFile(req.newModelVersion, req.modelUrl);
       const claimed = await Round.findOneAndUpdate(
@@ -117,6 +134,7 @@ export function createFlBridgeService({ scheduler } = {}) {
         { $set: { model_version_after: req.newModelVersion, global_loss: req.globalLoss, global_accuracy: req.globalAccuracy } }
       );
 
+      await applyRejections(req.roundId, rejections);
       if (used.length) {
         await Update.updateMany(
           { round_id: req.roundId, status: { $in: ['accepted', 'compressed'] }, update_id: { $nin: used } },
@@ -275,6 +293,50 @@ export function createFlBridgeService({ scheduler } = {}) {
         },
         resourcePath,
       };
+    },
+
+    async getModelDownloadUrl(req) {
+      if (req.modelVersion != null && (!Number.isInteger(req.modelVersion) || req.modelVersion <= 0)) {
+        throw invalidArg('model_version must be > 0, or left out for the active model');
+      }
+      const model = req.modelVersion != null
+        ? await GlobalModel.findOne({ model_version: req.modelVersion })
+        : await GlobalModel.findOne({ is_active: true });
+      if (!model) throw notFound(req.modelVersion != null ? `Model version ${req.modelVersion} not found` : 'There is no active model yet');
+      const signed = signedUrl.sign(modelPath(model.model_version));
+      return {
+        downloadUrl: signed.url,
+        modelVersion: model.model_version,
+        sha256: model.sha256 ?? '',
+        sizeBytes: BigInt(model.size_bytes ?? 0),
+        expiresAt: signed.expiresAt.toISOString(),
+        refreshUntil: signed.refreshUntil.toISOString(),
+        roundId: model.round_id ?? '',
+      };
+    },
+
+    async failRound(req) {
+      if (!req.roundId) throw invalidArg('round_id is required');
+      const reason = String(req.reason ?? '').trim().slice(0, 500);
+      if (!reason) throw invalidArg('reason is required');
+      const round = await Round.findOne({ round_id: req.roundId });
+      if (!round) throw notFound('Round not found');
+      if (round.status !== 'aggregating') throw failedPrecondition(`Round is ${round.status}; only a round being aggregated can be failed`);
+      const usable = await usableUpdateIds(req.roundId);
+      const rejections = rejectionsOf(req, new Set(usable));
+
+      const failedReason = `FL server: ${reason}`;
+      const updated = await Round.findOneAndUpdate(
+        { round_id: req.roundId, status: 'aggregating' },
+        { $set: { status: 'failed', failed_reason: failedReason, completed_at: new Date() }, $unset: { running: 1 } },
+        { returnDocument: 'after' }
+      );
+      if (!updated) throw failedPrecondition('This round was completed or failed in the meantime');
+      await applyRejections(req.roundId, rejections);
+
+      publish('round_failed', { round_id: req.roundId, reason: failedReason }, ADMIN_AND_CLIENTS);
+      await logEvent({ level: 'error', actor: 'fl-server', eventType: 'round.failed', details: { round_id: req.roundId, reason: failedReason } });
+      return { failed: true };
     },
 
     async reportFlStatus(req) {

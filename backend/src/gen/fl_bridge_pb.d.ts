@@ -107,6 +107,11 @@ export declare type CompleteRoundRequest = Message<"federix.v1.CompleteRoundRequ
    * @generated from field: repeated string used_update_ids = 6;
    */
   usedUpdateIds: string[];
+
+  /**
+   * @generated from field: map<string, string> rejection_reasons = 7;
+   */
+  rejectionReasons: { [key: string]: string };
 };
 
 /**
@@ -561,6 +566,110 @@ export declare type FlStatusReportAck = Message<"federix.v1.FlStatusReportAck"> 
 export declare const FlStatusReportAckSchema: GenMessage<FlStatusReportAck>;
 
 /**
+ * @generated from message federix.v1.ModelDownloadUrlRequest
+ */
+export declare type ModelDownloadUrlRequest = Message<"federix.v1.ModelDownloadUrlRequest"> & {
+  /**
+   * @generated from field: optional int32 model_version = 1;
+   */
+  modelVersion?: number | undefined;
+};
+
+/**
+ * Describes the message federix.v1.ModelDownloadUrlRequest.
+ * Use `create(ModelDownloadUrlRequestSchema)` to create a new message.
+ */
+export declare const ModelDownloadUrlRequestSchema: GenMessage<ModelDownloadUrlRequest>;
+
+/**
+ * @generated from message federix.v1.ModelDownloadUrlResponse
+ */
+export declare type ModelDownloadUrlResponse = Message<"federix.v1.ModelDownloadUrlResponse"> & {
+  /**
+   * @generated from field: string download_url = 1;
+   */
+  downloadUrl: string;
+
+  /**
+   * @generated from field: int32 model_version = 2;
+   */
+  modelVersion: number;
+
+  /**
+   * @generated from field: string sha256 = 3;
+   */
+  sha256: string;
+
+  /**
+   * @generated from field: int64 size_bytes = 4;
+   */
+  sizeBytes: bigint;
+
+  /**
+   * @generated from field: string expires_at = 5;
+   */
+  expiresAt: string;
+
+  /**
+   * @generated from field: string refresh_until = 6;
+   */
+  refreshUntil: string;
+
+  /**
+   * @generated from field: string round_id = 7;
+   */
+  roundId: string;
+};
+
+/**
+ * Describes the message federix.v1.ModelDownloadUrlResponse.
+ * Use `create(ModelDownloadUrlResponseSchema)` to create a new message.
+ */
+export declare const ModelDownloadUrlResponseSchema: GenMessage<ModelDownloadUrlResponse>;
+
+/**
+ * @generated from message federix.v1.FailRoundRequest
+ */
+export declare type FailRoundRequest = Message<"federix.v1.FailRoundRequest"> & {
+  /**
+   * @generated from field: string round_id = 1;
+   */
+  roundId: string;
+
+  /**
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: map<string, string> rejection_reasons = 3;
+   */
+  rejectionReasons: { [key: string]: string };
+};
+
+/**
+ * Describes the message federix.v1.FailRoundRequest.
+ * Use `create(FailRoundRequestSchema)` to create a new message.
+ */
+export declare const FailRoundRequestSchema: GenMessage<FailRoundRequest>;
+
+/**
+ * @generated from message federix.v1.FailRoundResponse
+ */
+export declare type FailRoundResponse = Message<"federix.v1.FailRoundResponse"> & {
+  /**
+   * @generated from field: bool failed = 1;
+   */
+  failed: boolean;
+};
+
+/**
+ * Describes the message federix.v1.FailRoundResponse.
+ * Use `create(FailRoundResponseSchema)` to create a new message.
+ */
+export declare const FailRoundResponseSchema: GenMessage<FailRoundResponse>;
+
+/**
  * @generated from service federix.v1.FlBridgeService
  */
 export declare const FlBridgeService: GenService<{
@@ -643,6 +752,22 @@ export declare const FlBridgeService: GenService<{
     methodKind: "unary";
     input: typeof FlStatusReportSchema;
     output: typeof FlStatusReportAckSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.FlBridgeService.GetModelDownloadUrl
+   */
+  getModelDownloadUrl: {
+    methodKind: "unary";
+    input: typeof ModelDownloadUrlRequestSchema;
+    output: typeof ModelDownloadUrlResponseSchema;
+  },
+  /**
+   * @generated from rpc federix.v1.FlBridgeService.FailRound
+   */
+  failRound: {
+    methodKind: "unary";
+    input: typeof FailRoundRequestSchema;
+    output: typeof FailRoundResponseSchema;
   },
 }>;
 

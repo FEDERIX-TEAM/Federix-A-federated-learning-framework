@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from federix.spec import ModelSpec
+from federix_sdk.spec import ModelSpec
 
 
 def spec_of(model):
