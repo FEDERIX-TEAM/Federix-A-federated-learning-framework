@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -40,3 +41,12 @@ class Trainer(ABC):
     @abstractmethod
     def train(self, config: RoundConfig) -> TrainResult:
         raise NotImplementedError
+
+
+def warn_if_unstable(lr, mu):
+    if lr * mu >= 2:
+        logging.getLogger("federix_sdk").warning(
+            "lr * mu = %.3g >= 2: plain SGD on the FedProx term will diverge; lower lr or ask the admin to lower mu", lr * mu
+        )
+        return True
+    return False
