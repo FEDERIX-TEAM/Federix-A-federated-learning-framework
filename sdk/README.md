@@ -71,6 +71,38 @@ pass; values are validated and unknown names are refused.
 | `request_timeout` / `connect_timeout` | 30 / 10 | Seconds per call / to connect |
 | `heartbeat_interval` | 20 | Seconds between heartbeats (the server drops a participant after `HEARTBEAT_TIMEOUT_MS`) |
 | `refresh_margin` | 30 | Refresh the access token when it has less than this many seconds left |
+| `chunk_size_bytes` / `transfer_retries` / `transfer_timeout` | 1048576 / 5 / 120 | Upload chunk size, retries after a dropped connection, seconds per transfer request |
+| `round_poll_interval` | 5 | Seconds between checks for a new round in `run()` |
+
+## Taking part in rounds
+```python
+from federix_sdk import ClientSettings, FederixClient, Session
+from federix_sdk.trainers.pytorch import TorchFedProxTrainer
+
+trainer = TorchFedProxTrainer(model, train_data, held_out_data, lr=0.05)
+with Session(ClientSettings.load()) as session, FederixClient(session, trainer) as client:
+    client.run()                      # wait for rounds and take part in each one; max_rounds= to stop early
+```
+For every round `FederixClient.run_round(round_id)`:
+1. joins with `local_data_size` and starts the heartbeat;
+2. downloads the global model (resuming with `Range`), checks its model spec against the local model
+   (`ModelMismatch` if the federation uses a different architecture) and loads the weights;
+3. trains with the server's `mu`, `local_epochs` and `batch_size`; losses are measured on the client's held-out data;
+4. sends its metrics with `PrepareUpdate`, and stops there if the server rejects the update;
+5. compresses `trained − global` to the ratio the server returned (top-k with error feedback), encodes FXW1;
+6. uploads in `chunk_size_bytes` chunks, continuing from the server's offset after a failure and refreshing an
+   expired URL; checks the server's sha256;
+7. calls `SubmitUpdate` with the sha256 and returns a `RoundOutcome` (`submitted`, `rejected` or `skipped`, bytes
+   sent, utility, ratio, losses, timings).
+
+A trainer for any framework implements `Trainer`: an `adapter` (`ModelAdapter`), `num_samples()`,
+`label_counts()` and `train(config) -> TrainResult(loss_before, loss_after)`. The SDK does the rest.
+
+### Example
+    FEDERIX_SDK_SERVER_URL=http://127.0.0.1:4000 FEDERIX_SDK_ENROLLMENT_TOKEN=fdx_enroll_... \
+        uv run python examples/mnist_client.py --shard 0 --shards 10 --rounds 3
+
+Each client owns a label-skewed slice of MNIST (`--alpha`) and trains the same MLP as the brain.
 
 ## Model weights
 Weights travel as a flat float32 vector plus a `ModelSpec` (ordered `(name, shape, dtype)` with a sha256), encoded
