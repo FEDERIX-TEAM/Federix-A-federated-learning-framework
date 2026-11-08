@@ -5,6 +5,7 @@ import socket
 import subprocess
 import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,8 +35,8 @@ def node(args, env, timeout=60):
     return subprocess.run(["node", *args], cwd=BACKEND, env={**os.environ, **env}, capture_output=True, text=True, timeout=timeout)
 
 
-@pytest.fixture(scope="session")
-def backend():
+@contextmanager
+def start_backend(extra_env=None):
     if shutil.which("node") is None:
         raise RuntimeError("node is required to run the SDK tests against the real backend")
     db = f"federix_sdktest_{os.getpid()}_{secrets.token_hex(4)}"
@@ -57,6 +58,7 @@ def backend():
         "NODE_ENV": "test", "HOST": "127.0.0.1", "PORT": str(port), "MONGO_URI": mongo_uri, "REDIS_URL": REDIS_URL,
         "INTERNAL_SERVICE_TOKEN": internal, "PUBLIC_BASE_URL": base_url, "STORAGE_DIR": storage,
         "LOG_LEVEL": "warn", "SCHEDULER_INTERVAL_MS": "3600000", "RATE_LIMIT_ENABLED": "false",
+        **(extra_env or {}),
     }
     proc = subprocess.Popen(["node", "src/index.js"], cwd=BACKEND, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     try:
@@ -83,3 +85,15 @@ def backend():
         node(["-e", "import('mongoose').then(async ({default: m}) => { await m.connect(process.env.MONGO_URI); await m.connection.dropDatabase(); await m.disconnect(); })"],
              {"MONGO_URI": mongo_uri})
         shutil.rmtree(storage, ignore_errors=True)
+
+
+@pytest.fixture(scope="session")
+def backend():
+    with start_backend() as b:
+        yield b
+
+
+@pytest.fixture(scope="module")
+def short_token_backend():
+    with start_backend({"JWT_ACCESS_EXPIRES_IN": "2s"}) as b:
+        yield b
