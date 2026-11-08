@@ -5,8 +5,10 @@ with the server's default HTTP/1.1 mode, and it moves model weights in the frame
 
 ## Install
     uv sync                      # development: SDK, tests, protobuf codegen and the PyTorch adapter
-    pip install federix-sdk      # clients
-    pip install 'federix-sdk[torch]'
+    pip install federix-sdk              # clients
+    pip install 'federix-sdk[torch]'     # PyTorch adapter and trainer
+    pip install 'federix-sdk[keras]'     # Keras 3 adapter and trainer (JAX backend)
+    pip install 'federix-sdk[jax]'       # JAX adapter and trainer (any pytree: Flax, Haiku, plain JAX)
 
 ## Calling the server
 ```python
@@ -97,6 +99,46 @@ For every round `FederixClient.run_round(round_id)`:
 
 A trainer for any framework implements `Trainer`: an `adapter` (`ModelAdapter`), `num_samples()`,
 `label_counts()` and `train(config) -> TrainResult(loss_before, loss_after)`. The SDK does the rest.
+
+## Several frameworks in one federation
+Clients may train with PyTorch, Keras or JAX in the same federation. What has to match is the model, written as
+one canonical layout: an ordered list of parameter names and shapes. The canonical layout is whatever the global
+model was built with (usually the PyTorch names, e.g. `1.weight` with shape `(out, in)`). A client in another
+framework passes a `Layout` that maps each canonical parameter to its own parameter, transposing where the
+framework stores the matrix the other way round:
+
+```python
+from federix_sdk import Layout
+from federix_sdk.trainers.keras import KerasFedProxTrainer
+from federix_sdk.trainers.jax import JaxFedProxTrainer
+
+keras_layout = Layout([
+    ("1.weight", "hidden/kernel", True),      # Keras Dense kernels are (in, out)
+    ("1.bias", "hidden/bias"),
+    ("3.weight", "out/kernel", True),
+    ("3.bias", "out/bias"),
+])
+trainer = KerasFedProxTrainer(keras_model, (x_train, y_train), (x_val, y_val), layout=keras_layout)
+
+jax_layout = Layout([("1.weight", "['hidden']['w']", True), ("1.bias", "['hidden']['b']"),
+                     ("3.weight", "['out']['w']", True), ("3.bias", "['out']['b']")])
+trainer = JaxFedProxTrainer(params, apply_fn, (x_train, y_train), (x_val, y_val), layout=jax_layout)
+```
+With the layout, the adapter's model spec hash equals the federation's, so the download check passes, and the
+same weights give the same outputs in every framework. Every local parameter must appear exactly once; mistakes
+(unknown names, unmapped parameters, transposing a non-matrix) are reported when the adapter is created. Local
+parameter names are PyTorch's `named_parameters()`, Keras's `weight.path` (including non-trainable weights such as
+BatchNorm statistics) and JAX's `jax.tree_util.keystr` paths.
+
+| Framework | Adapter | Trainer | Notes |
+|---|---|---|---|
+| PyTorch | `TorchAdapter` | `TorchFedProxTrainer` | |
+| Keras 3 | `KerasAdapter` | `KerasFedProxTrainer` | The trainer needs `KERAS_BACKEND=jax`; with another backend use `KerasAdapter` with your own `Trainer`. The model must output logits. |
+| JAX | `JaxAdapter` | `JaxFedProxTrainer` | Works on any pytree of float32 arrays; `apply_fn(params, x)` returns logits. |
+
+All trainers apply the FedProx term exactly. Keep `lr * mu` well below 2: plain SGD on the proximal term diverges
+above that, and the trainers log a warning when it happens. Only float32 parameters are supported.
+TensorFlow is not tested yet: on Python 3.14 only a pre-release is available.
 
 ### Example
     FEDERIX_SDK_SERVER_URL=http://127.0.0.1:4000 FEDERIX_SDK_ENROLLMENT_TOKEN=fdx_enroll_... \

@@ -1,7 +1,7 @@
 from collections import Counter
 
 from federix_sdk.adapters.pytorch import TorchAdapter
-from federix_sdk.trainer import Trainer, TrainResult
+from federix_sdk.trainer import Trainer, TrainResult, warn_if_unstable
 
 import torch
 import torch.nn.functional as F
@@ -47,6 +47,7 @@ class TorchFedProxTrainer(Trainer):
         return total / len(self.val_data)
 
     def train(self, config):
+        warn_if_unstable(self.lr, config.mu)
         start = [p.detach().clone() for p in self.model.parameters()]
         before = self._val_loss()
         opt = torch.optim.SGD(self.model.parameters(), lr=self.lr)

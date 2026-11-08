@@ -1,4 +1,7 @@
 import os
+
+os.environ.setdefault("KERAS_BACKEND", "jax")
+
 import secrets
 import shutil
 import socket
