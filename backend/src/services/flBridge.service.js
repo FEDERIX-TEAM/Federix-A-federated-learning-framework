@@ -11,7 +11,7 @@ import { COMPRESSION_LEVEL_TO_PROTO, ROUND_READY_REASON_TO_PROTO, FL_SERVER_STAT
 import { FlServerStatus } from '../../models/FlServerStatus.js';
 import { readyEventOf, usableUpdateIds } from '../roundScheduler.js';
 import { configForRound, configForCurrentRound, num } from '../lib/helpers.js';
-import { invalidArg, notFound, alreadyExists, failedPrecondition } from '../lib/errors.js';
+import { invalidArg, notFound, alreadyExists, failedPrecondition, throwIfDeadlineExceeded } from '../lib/errors.js';
 import { publish, ADMIN_ROLES, ADMIN_AND_CLIENTS } from '../lib/events.js';
 import { storage } from '../storage.js';
 
@@ -250,6 +250,7 @@ export function createFlBridgeService({ scheduler } = {}) {
           }
           yield queue.shift();
         }
+        throwIfDeadlineExceeded(ctx.signal);
       } finally {
         unsubscribe();
         ctx.signal.removeEventListener('abort', onAbort);

@@ -2,6 +2,7 @@ import { authOf } from '../lib/helpers.js';
 import { subscribe } from '../lib/events.js';
 import { streamAuthProblem } from '../lib/streamAuth.js';
 import { config } from '../../config/index.js';
+import { throwIfDeadlineExceeded } from '../lib/errors.js';
 
 export function createEventService({ redis, logger }) {
   return {
@@ -32,6 +33,7 @@ export function createEventService({ redis, logger }) {
       try {
         yield* subscribe(auth, stop.signal);
         if (failure) throw failure;
+        throwIfDeadlineExceeded(ctx.signal);
       } finally {
         clearInterval(timer);
         ctx.signal.removeEventListener('abort', onClientGone);
