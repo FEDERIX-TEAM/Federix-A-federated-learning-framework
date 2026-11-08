@@ -7,8 +7,8 @@ import torch
 
 from federix.adapters.pytorch import holdout_loss_fn, spec_of, to_vector
 from federix.aggregation import aggregate, sample_weights, utility_weights
-from federix.codec import DensePayload, decode, encode, encoded_size
-from federix.compression import ErrorFeedback
+from federix_sdk.codec import DensePayload, decode, encode, encoded_size
+from federix_sdk.compression import ErrorFeedback
 from federix.config import Config, ConfigError, setup_cpu
 from federix.data import load_mnist, make_clients_and_holdout
 from federix.evaluation import evaluate

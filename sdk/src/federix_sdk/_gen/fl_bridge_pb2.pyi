@@ -32,20 +32,29 @@ class ModelMetrics(_message.Message):
     def __init__(self, global_loss: _Optional[float] = ..., global_accuracy: _Optional[float] = ...) -> None: ...
 
 class CompleteRoundRequest(_message.Message):
-    __slots__ = ("round_id", "new_model_version", "model_url", "global_loss", "global_accuracy", "used_update_ids")
+    __slots__ = ("round_id", "new_model_version", "model_url", "global_loss", "global_accuracy", "used_update_ids", "rejection_reasons")
+    class RejectionReasonsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     ROUND_ID_FIELD_NUMBER: _ClassVar[int]
     NEW_MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
     MODEL_URL_FIELD_NUMBER: _ClassVar[int]
     GLOBAL_LOSS_FIELD_NUMBER: _ClassVar[int]
     GLOBAL_ACCURACY_FIELD_NUMBER: _ClassVar[int]
     USED_UPDATE_IDS_FIELD_NUMBER: _ClassVar[int]
+    REJECTION_REASONS_FIELD_NUMBER: _ClassVar[int]
     round_id: str
     new_model_version: int
     model_url: str
     global_loss: float
     global_accuracy: float
     used_update_ids: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, round_id: _Optional[str] = ..., new_model_version: _Optional[int] = ..., model_url: _Optional[str] = ..., global_loss: _Optional[float] = ..., global_accuracy: _Optional[float] = ..., used_update_ids: _Optional[_Iterable[str]] = ...) -> None: ...
+    rejection_reasons: _containers.ScalarMap[str, str]
+    def __init__(self, round_id: _Optional[str] = ..., new_model_version: _Optional[int] = ..., model_url: _Optional[str] = ..., global_loss: _Optional[float] = ..., global_accuracy: _Optional[float] = ..., used_update_ids: _Optional[_Iterable[str]] = ..., rejection_reasons: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class CompleteRoundResponse(_message.Message):
     __slots__ = ("success", "next_round_scheduled", "model_id")
@@ -218,3 +227,50 @@ class FlStatusReportAck(_message.Message):
     accepted: bool
     server_time: str
     def __init__(self, accepted: _Optional[bool] = ..., server_time: _Optional[str] = ...) -> None: ...
+
+class ModelDownloadUrlRequest(_message.Message):
+    __slots__ = ("model_version",)
+    MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
+    model_version: int
+    def __init__(self, model_version: _Optional[int] = ...) -> None: ...
+
+class ModelDownloadUrlResponse(_message.Message):
+    __slots__ = ("download_url", "model_version", "sha256", "size_bytes", "expires_at", "refresh_until", "round_id")
+    DOWNLOAD_URL_FIELD_NUMBER: _ClassVar[int]
+    MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
+    SHA256_FIELD_NUMBER: _ClassVar[int]
+    SIZE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    REFRESH_UNTIL_FIELD_NUMBER: _ClassVar[int]
+    ROUND_ID_FIELD_NUMBER: _ClassVar[int]
+    download_url: str
+    model_version: int
+    sha256: str
+    size_bytes: int
+    expires_at: str
+    refresh_until: str
+    round_id: str
+    def __init__(self, download_url: _Optional[str] = ..., model_version: _Optional[int] = ..., sha256: _Optional[str] = ..., size_bytes: _Optional[int] = ..., expires_at: _Optional[str] = ..., refresh_until: _Optional[str] = ..., round_id: _Optional[str] = ...) -> None: ...
+
+class FailRoundRequest(_message.Message):
+    __slots__ = ("round_id", "reason", "rejection_reasons")
+    class RejectionReasonsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    ROUND_ID_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    REJECTION_REASONS_FIELD_NUMBER: _ClassVar[int]
+    round_id: str
+    reason: str
+    rejection_reasons: _containers.ScalarMap[str, str]
+    def __init__(self, round_id: _Optional[str] = ..., reason: _Optional[str] = ..., rejection_reasons: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class FailRoundResponse(_message.Message):
+    __slots__ = ("failed",)
+    FAILED_FIELD_NUMBER: _ClassVar[int]
+    failed: bool
+    def __init__(self, failed: _Optional[bool] = ...) -> None: ...

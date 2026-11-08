@@ -1,5 +1,6 @@
 import dataclasses
 import os
+import re
 import tomllib
 from dataclasses import dataclass, fields
 from pathlib import Path
@@ -8,6 +9,7 @@ ENV_PREFIX = "FEDERIX_"
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
 AGGREGATIONS = ("utility", "fedprox")
 ATTACKS = ("scale", "noise", "sign_flip")
+WORKER_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 
 
 class ConfigError(ValueError):
@@ -58,6 +60,16 @@ class Config:
     seed: int = 0
     log_dir: str = "logs"
     log_level: str = "INFO"
+    backend_url: str = "http://127.0.0.1:4000"
+    internal_token: str = ""
+    worker_id: str = "brain-1"
+    request_timeout: float = 30.0
+    watch_timeout: float = 120.0
+    reconnect_delay: float = 1.0
+    reconnect_max_delay: float = 30.0
+    status_interval: float = 30.0
+    transfer_retries: int = 5
+    eval_size: int = 0
 
     def __post_init__(self):
         if isinstance(self.ratios, list):
@@ -106,6 +118,14 @@ class Config:
         need(self.log_level in LOG_LEVELS, f"log_level must be one of {', '.join(LOG_LEVELS)} (got {self.log_level!r})")
         need(bool(self.data_dir), "data_dir must not be empty")
         need(bool(self.log_dir), "log_dir must not be empty")
+        need(self.backend_url.startswith(("http://", "https://")), f"backend_url must start with http:// or https:// (got {self.backend_url!r})")
+        need(bool(WORKER_ID.fullmatch(self.worker_id)), f"worker_id must be 1-64 letters, digits, . _ : - (got {self.worker_id!r})")
+        for name in ("request_timeout", "watch_timeout", "reconnect_delay", "status_interval"):
+            need(getattr(self, name) > 0, f"{name} must be > 0 (got {getattr(self, name)})")
+        need(self.reconnect_max_delay >= self.reconnect_delay,
+             f"reconnect_max_delay must be >= reconnect_delay (got {self.reconnect_max_delay}, {self.reconnect_delay})")
+        need(self.transfer_retries >= 0, f"transfer_retries must be >= 0 (got {self.transfer_retries})")
+        need(self.eval_size >= 0, f"eval_size must be >= 0, 0 meaning the whole test set (got {self.eval_size})")
 
         if problems:
             raise ConfigError(problems)
@@ -153,8 +173,11 @@ class Config:
             raise ConfigError(problems)
         return cls(**converted).validate()
 
-    def as_dict(self):
-        return dataclasses.asdict(self)
+    def as_dict(self, redact=False):
+        values = dataclasses.asdict(self)
+        if redact and values.get("internal_token"):
+            values["internal_token"] = "***"
+        return values
 
 
 def _convert(f, value):

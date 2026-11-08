@@ -154,7 +154,7 @@ and is frozen per round in `config_snapshot`.
 - **Rate limiting** (`interceptors/rateLimit.interceptor.js`): a fixed window in Redis, `RATE_LIMIT_PER_PRINCIPAL` calls per signed-in user or client and `RATE_LIMIT_PER_IP` per IP for public RPCs; over the limit the call fails with `ResourceExhausted` and says when to retry. The client IP is set by the server, never taken from a request header, and the FL server's internal calls are exempt.
 - **Login lockout:** after `LOGIN_MAX_ATTEMPTS` failed logins an admin email or SDK client id is locked for `LOGIN_LOCKOUT_SECONDS` (`ResourceExhausted`), even with the right password; a successful login resets the count.
 - **CORS** answers only for `CORS_ALLOWED_ORIGINS`.
-- Maintenance mode (`SetMaintenance`) blocks `ClientService` and the FL server's new-work RPCs (`TriggerRound`, `PushModel`, `ComputeUtility`) with `Unavailable`. An aggregation already in progress can finish (`CompleteRound`, `GetRoundUpdates`, `GetModelUploadUrl`), and status reporting and `WatchRounds` keep working. Admin/system RPCs stay reachable so it can be switched off.
+- Maintenance mode (`SetMaintenance`) blocks `ClientService` and the FL server's new-work RPCs (`TriggerRound`, `PushModel`, `ComputeUtility`) with `Unavailable`. An aggregation already in progress can finish (`CompleteRound`, `FailRound`, `GetRoundUpdates`, `GetModelUploadUrl`, `GetModelDownloadUrl`), and status reporting and `WatchRounds` keep working. Admin/system RPCs stay reachable so it can be switched off.
 
 ## RPCs and permissions
 
@@ -203,6 +203,8 @@ Generated from `interceptors/rbacRules.js`.
 | WatchRounds | internal token |
 | GetModelUploadUrl | internal token |
 | ReportFlStatus | internal token |
+| GetModelDownloadUrl | internal token |
+| FailRound | internal token |
 
 #### AdminService
 
@@ -302,7 +304,11 @@ A `connected` event arrives first and a `ping` every 30s as keep-alive.
 6. FL server `TriggerRound` (→ `aggregating`), `GetRoundUpdates` (download URL, sha256, bytes, `data_size`,
    ratio), aggregates, uploads the model with `GetModelUploadUrl`, then `CompleteRound` with
    `used_update_ids` (→ `complete`). The model must be at `/models/<version>`; its size and sha256 are recorded,
-   unused updates are marked rejected and only contributors get participation credit.
+   unused updates are marked rejected and only contributors get participation credit. `rejection_reasons`
+   (update id → reason) records why the FL server left an update out; an update cannot be both used and rejected.
+   The FL server reads the current or a named model with `GetModelDownloadUrl` (signed, refreshable, with the
+   recorded sha256). When no update is usable it calls `FailRound(reason, rejection_reasons)` (→ `failed`, reason
+   prefixed `FL server:`) instead of waiting for the aggregation timeout.
 
 **Scheduler** (`src/roundScheduler.js`, every `SCHEDULER_INTERVAL_MS`):
 

@@ -15,6 +15,8 @@ service FlBridgeService {
   rpc WatchRounds(WatchRoundsRequest) returns (stream RoundReadyEvent);
   rpc GetModelUploadUrl(ModelUploadUrlRequest) returns (ModelUploadUrlResponse);
   rpc ReportFlStatus(FlStatusReport) returns (FlStatusReportAck);
+  rpc GetModelDownloadUrl(ModelDownloadUrlRequest) returns (ModelDownloadUrlResponse);
+  rpc FailRound(FailRoundRequest) returns (FailRoundResponse);
 }
 
 message TriggerRoundRequest {
@@ -39,6 +41,7 @@ message CompleteRoundRequest {
   double global_loss = 4;
   double global_accuracy = 5;
   repeated string used_update_ids = 6;
+  map<string, string> rejection_reasons = 7;
 }
 
 message CompleteRoundResponse {
@@ -140,4 +143,28 @@ message FlStatusReport {
 message FlStatusReportAck {
   bool accepted = 1;
   string server_time = 2;
+}
+
+message ModelDownloadUrlRequest {
+  optional int32 model_version = 1;
+}
+
+message ModelDownloadUrlResponse {
+  string download_url = 1;
+  int32 model_version = 2;
+  string sha256 = 3;
+  int64 size_bytes = 4;
+  string expires_at = 5;
+  string refresh_until = 6;
+  string round_id = 7;
+}
+
+message FailRoundRequest {
+  string round_id = 1;
+  string reason = 2;
+  map<string, string> rejection_reasons = 3;
+}
+
+message FailRoundResponse {
+  bool failed = 1;
 }

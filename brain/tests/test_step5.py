@@ -7,10 +7,10 @@ import pytest
 import torch
 
 from federix.adapters.pytorch import load_vector, spec_of, to_vector
-from federix.codec import HEADER_SIZE, CodecError, DensePayload, TopKPayload, decode, encode, encoded_size
-from federix.compression import ErrorFeedback, compress, topk_count
+from federix_sdk.codec import HEADER_SIZE, CodecError, DensePayload, TopKPayload, decode, encode, encoded_size
+from federix_sdk.compression import ErrorFeedback, compress, topk_count
 from federix.model import make_model
-from federix.spec import ModelSpec
+from federix_sdk.spec import ModelSpec
 
 VECTORS = json.loads((Path(__file__).resolve().parents[2] / "spec" / "codec_vectors.json").read_text())
 SPEC = ModelSpec.from_pairs(VECTORS["spec"]["params"])
