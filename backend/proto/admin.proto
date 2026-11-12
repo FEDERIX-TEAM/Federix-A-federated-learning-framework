@@ -56,6 +56,17 @@ message OverviewResponse {
   string current_round_status = 4;
   int32 latest_model_version = 5;
   string health = 6;
+  int32 current_round_number = 7;
+  int32 current_round_participants = 8;
+  int32 current_round_max_clients = 9;
+  int32 current_round_updates = 10;
+  string current_round_started_at = 11;
+  string current_round_deadline = 12;
+  string current_round_ready_at = 13;
+  optional double latest_model_accuracy = 14;
+  optional double latest_model_loss = 15;
+  int32 completed_rounds = 16;
+  int32 banned_clients = 17;
 }
 
 message ListClientsRequest {

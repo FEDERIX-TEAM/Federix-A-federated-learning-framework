@@ -5,23 +5,25 @@ import { initials, matches, safeNext } from "@/lib/text";
 
 describe("readRuntimeConfig", () => {
   it("uses defaults and trims a trailing slash", () => {
-    expect(readRuntimeConfig({})).toEqual({ apiUrl: "http://127.0.0.1:4000", healthPollMs: 10000 });
-    expect(readRuntimeConfig({ FEDERIX_API_URL: "https://fl.example.com/", FEDERIX_HEALTH_POLL_MS: "2500" })).toEqual({
+    expect(readRuntimeConfig({})).toEqual({ apiUrl: "http://127.0.0.1:4000", healthPollMs: 10000, grafanaUrl: null });
+    expect(readRuntimeConfig({ FEDERIX_API_URL: "https://fl.example.com/", FEDERIX_HEALTH_POLL_MS: "2500", FEDERIX_GRAFANA_URL: "http://grafana:3000/" })).toEqual({
       apiUrl: "https://fl.example.com",
       healthPollMs: 2500,
+      grafanaUrl: "http://grafana:3000",
     });
   });
 
   it("lists every problem at once", () => {
     let error: unknown;
     try {
-      readRuntimeConfig({ FEDERIX_API_URL: "ftp://x", FEDERIX_HEALTH_POLL_MS: "fast" });
+      readRuntimeConfig({ FEDERIX_API_URL: "ftp://x", FEDERIX_HEALTH_POLL_MS: "fast", FEDERIX_GRAFANA_URL: "grafana" });
     } catch (err) {
       error = err;
     }
     expect(error).toBeInstanceOf(RuntimeConfigError);
     expect(String((error as Error).message)).toContain("FEDERIX_API_URL must be an http(s) URL");
     expect(String((error as Error).message)).toContain("FEDERIX_HEALTH_POLL_MS must be a whole number >= 1000");
+    expect(String((error as Error).message)).toContain("FEDERIX_GRAFANA_URL must be an http(s) URL");
   });
 });
 

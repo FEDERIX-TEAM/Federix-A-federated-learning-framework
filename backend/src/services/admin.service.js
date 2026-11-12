@@ -66,18 +66,35 @@ export function createAdminService({ redis }) {
   return {
     // ───────────── Clients ─────────────
     async getOverview() {
-      const [totalClients, activeClients, activeRound, latestModel] = await Promise.all([
+      const [totalClients, activeClients, bannedClients, activeRound, latestModel, completedRounds] = await Promise.all([
         Client.countDocuments({}),
         Client.countDocuments({ status: 'active' }),
+        Client.countDocuments({ $or: [{ banned_until: new Date(0) }, { banned_until: { $gt: new Date() } }] }),
         Round.findOne({ status: { $in: ['active', 'aggregating'] } }).sort({ round_number: -1 }),
         GlobalModel.findOne({ is_active: true }),
+        Round.countDocuments({ status: 'complete' }),
       ]);
+      const roundUpdates = activeRound
+        ? await Update.countDocuments({ round_id: activeRound.round_id, status: { $in: ['accepted', 'compressed'] } })
+        : 0;
+      const metric = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
       return {
         totalClients,
         activeClients,
+        bannedClients,
+        completedRounds,
         currentRoundId: activeRound?.round_id ?? '',
         currentRoundStatus: activeRound?.status ?? '',
+        currentRoundNumber: activeRound?.round_number ?? 0,
+        currentRoundParticipants: activeRound ? joinedCount(activeRound) : 0,
+        currentRoundMaxClients: activeRound?.max_clients ?? 0,
+        currentRoundUpdates: roundUpdates,
+        currentRoundStartedAt: dateToIso(activeRound?.started_at),
+        currentRoundDeadline: dateToIso(activeRound?.deadline_at),
+        currentRoundReadyAt: dateToIso(activeRound?.ready_at),
         latestModelVersion: latestModel?.model_version ?? 0,
+        latestModelAccuracy: metric(latestModel?.metrics?.global_accuracy),
+        latestModelLoss: metric(latestModel?.metrics?.global_loss),
         health: 'ok',
       };
     },

@@ -1,6 +1,7 @@
 export interface RuntimeConfig {
   apiUrl: string;
   healthPollMs: number;
+  grafanaUrl: string | null;
 }
 
 export class RuntimeConfigError extends Error {}
@@ -39,7 +40,8 @@ export function readRuntimeConfig(env: Record<string, string | undefined> = proc
     }
   };
   const apiUrl = attempt(() => httpUrl("FEDERIX_API_URL", env.FEDERIX_API_URL, "http://127.0.0.1:4000"), "");
+  const grafanaUrl = attempt(() => (env.FEDERIX_GRAFANA_URL?.trim() ? httpUrl("FEDERIX_GRAFANA_URL", env.FEDERIX_GRAFANA_URL, "") : null), null);
   const healthPollMs = attempt(() => int("FEDERIX_HEALTH_POLL_MS", env.FEDERIX_HEALTH_POLL_MS, 10000, 1000), 10000);
   if (problems.length) throw new RuntimeConfigError(`Invalid dashboard configuration:\n  - ${problems.join("\n  - ")}`);
-  return { apiUrl, healthPollMs };
+  return { apiUrl, healthPollMs, grafanaUrl };
 }
