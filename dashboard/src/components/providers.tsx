@@ -6,7 +6,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { AuthProvider } from "@/components/auth";
 import { RuntimeProvider } from "@/components/runtime";
 import { ThemeProvider } from "@/components/theme";
-import { SessionExpired } from "@/lib/auth/session";
+import { isSessionExpired } from "@/lib/api";
 import type { RuntimeConfig } from "@/lib/runtime";
 
 const NO_RETRY = new Set([Code.Unauthenticated, Code.PermissionDenied, Code.InvalidArgument, Code.NotFound, Code.FailedPrecondition]);
@@ -19,7 +19,7 @@ export function Providers({ config, children }: { config: RuntimeConfig; childre
           queries: {
             staleTime: 5_000,
             refetchOnWindowFocus: true,
-            retry: (count, err) => !(err instanceof SessionExpired) && !NO_RETRY.has(ConnectError.from(err).code) && count < 2,
+            retry: (count, err) => !isSessionExpired(err) && !NO_RETRY.has(ConnectError.from(err).code) && count < 2,
           },
         },
       }),
