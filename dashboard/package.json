@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "test:all": "vitest run && playwright test"
+    "test:e2e": "next build && playwright test",
+    "test:all": "vitest run && next build && playwright test"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.17.0",
