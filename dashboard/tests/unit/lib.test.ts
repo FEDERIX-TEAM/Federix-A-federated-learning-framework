@@ -65,3 +65,17 @@ describe("text helpers", () => {
     expect(initials("")).toBe("?");
   });
 });
+
+describe("isSessionExpired", async () => {
+  const { isSessionExpired } = await import("@/lib/api");
+  const { SessionExpired } = await import("@/lib/auth/session");
+  const { ConnectError, Code } = await import("@connectrpc/connect");
+
+  it("recognises SessionExpired even when Connect wraps it", () => {
+    const raw = new SessionExpired();
+    expect(isSessionExpired(raw)).toBe(true);
+    expect(isSessionExpired(ConnectError.from(raw))).toBe(true);
+    expect(isSessionExpired(new ConnectError("nope", Code.Unavailable))).toBe(false);
+    expect(isSessionExpired(new Error("x"))).toBe(false);
+  });
+});

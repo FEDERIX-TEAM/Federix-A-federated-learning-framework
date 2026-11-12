@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { createApi, isAuthFailure, ROLE_FROM_PROTO, type Api } from "@/lib/api";
+import { createApi, isAuthFailure, isSessionExpired, ROLE_FROM_PROTO, type Api } from "@/lib/api";
 import { SESSION_KEY, SessionExpired, type Role, type StoredSession } from "@/lib/auth/session";
 import { useRuntime } from "@/components/runtime";
 
@@ -50,13 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = useCallback(
     async (session: StoredSession) => {
+      let me: { id: string; name: string; lastLogin: string } | undefined;
       try {
-        const me = await api.auth.getMe({});
-        setProfile(profileFrom(session, me));
+        me = await api.auth.getMe({});
       } catch (err) {
-        if (err instanceof SessionExpired || isAuthFailure(err)) throw err;
-        setProfile(profileFrom(session));
+        if (isSessionExpired(err) || isAuthFailure(err)) throw err;
       }
+      if (!api.session.current()) throw new SessionExpired();
+      setProfile(profileFrom(session, me));
     },
     [api],
   );

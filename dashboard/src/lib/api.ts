@@ -5,7 +5,7 @@ import { AuthService } from "@/gen/auth_pb";
 import { Role as ProtoRole } from "@/gen/common_pb";
 import { EventStreamService } from "@/gen/events_pb";
 import { SystemService } from "@/gen/system_pb";
-import { browserLock, SessionManager, type KeyValueStore, type Role } from "@/lib/auth/session";
+import { browserLock, SessionExpired, SessionManager, type KeyValueStore, type Role } from "@/lib/auth/session";
 
 const PUBLIC_METHODS = new Set(["AdminLogin", "RefreshToken", "HealthCheck", "GetVersion", "GetPublicConfig"]);
 
@@ -15,6 +15,11 @@ export const ROLE_FROM_PROTO: Partial<Record<ProtoRole, Role>> = {
   [ProtoRole.FL_ENGINEER]: "fl_engineer",
   [ProtoRole.VIEWER]: "viewer",
 };
+
+export function isSessionExpired(err: unknown): boolean {
+  if (err instanceof SessionExpired) return true;
+  return err instanceof ConnectError && err.cause instanceof SessionExpired;
+}
 
 export function isAuthFailure(err: unknown): boolean {
   const code = ConnectError.from(err).code;
