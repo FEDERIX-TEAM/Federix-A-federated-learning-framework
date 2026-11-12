@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Welcome } from "./Welcome";
+import { Overview } from "./_overview/Overview";
 
 export const metadata: Metadata = { title: "Overview" };
 
 export default function OverviewPage() {
-  return <Welcome />;
+  return <Overview />;
 }

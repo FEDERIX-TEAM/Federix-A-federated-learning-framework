@@ -8,20 +8,42 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class OverviewResponse(_message.Message):
-    __slots__ = ("total_clients", "active_clients", "current_round_id", "current_round_status", "latest_model_version", "health")
+    __slots__ = ("total_clients", "active_clients", "current_round_id", "current_round_status", "latest_model_version", "health", "current_round_number", "current_round_participants", "current_round_max_clients", "current_round_updates", "current_round_started_at", "current_round_deadline", "current_round_ready_at", "latest_model_accuracy", "latest_model_loss", "completed_rounds", "banned_clients")
     TOTAL_CLIENTS_FIELD_NUMBER: _ClassVar[int]
     ACTIVE_CLIENTS_FIELD_NUMBER: _ClassVar[int]
     CURRENT_ROUND_ID_FIELD_NUMBER: _ClassVar[int]
     CURRENT_ROUND_STATUS_FIELD_NUMBER: _ClassVar[int]
     LATEST_MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
     HEALTH_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_ROUND_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_ROUND_PARTICIPANTS_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_ROUND_MAX_CLIENTS_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_ROUND_UPDATES_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_ROUND_STARTED_AT_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_ROUND_DEADLINE_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_ROUND_READY_AT_FIELD_NUMBER: _ClassVar[int]
+    LATEST_MODEL_ACCURACY_FIELD_NUMBER: _ClassVar[int]
+    LATEST_MODEL_LOSS_FIELD_NUMBER: _ClassVar[int]
+    COMPLETED_ROUNDS_FIELD_NUMBER: _ClassVar[int]
+    BANNED_CLIENTS_FIELD_NUMBER: _ClassVar[int]
     total_clients: int
     active_clients: int
     current_round_id: str
     current_round_status: str
     latest_model_version: int
     health: str
-    def __init__(self, total_clients: _Optional[int] = ..., active_clients: _Optional[int] = ..., current_round_id: _Optional[str] = ..., current_round_status: _Optional[str] = ..., latest_model_version: _Optional[int] = ..., health: _Optional[str] = ...) -> None: ...
+    current_round_number: int
+    current_round_participants: int
+    current_round_max_clients: int
+    current_round_updates: int
+    current_round_started_at: str
+    current_round_deadline: str
+    current_round_ready_at: str
+    latest_model_accuracy: float
+    latest_model_loss: float
+    completed_rounds: int
+    banned_clients: int
+    def __init__(self, total_clients: _Optional[int] = ..., active_clients: _Optional[int] = ..., current_round_id: _Optional[str] = ..., current_round_status: _Optional[str] = ..., latest_model_version: _Optional[int] = ..., health: _Optional[str] = ..., current_round_number: _Optional[int] = ..., current_round_participants: _Optional[int] = ..., current_round_max_clients: _Optional[int] = ..., current_round_updates: _Optional[int] = ..., current_round_started_at: _Optional[str] = ..., current_round_deadline: _Optional[str] = ..., current_round_ready_at: _Optional[str] = ..., latest_model_accuracy: _Optional[float] = ..., latest_model_loss: _Optional[float] = ..., completed_rounds: _Optional[int] = ..., banned_clients: _Optional[int] = ...) -> None: ...
 
 class ListClientsRequest(_message.Message):
     __slots__ = ("page", "limit", "status", "sort_by")

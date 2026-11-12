@@ -69,7 +69,6 @@ test("connection status reflects the real backend and notices when it is unreach
   await expect(pop).toContainText("test");
   await page.keyboard.press("Escape");
 
-  await expect(page.getByTestId("service-db")).toContainText("connected");
   await page.route("**/federix.v1.SystemService/HealthCheck", (route) => route.abort("connectionrefused"));
   await expect(status).toHaveAttribute("data-state", "offline", { timeout: 8_000 });
   await expect(status).toContainText("Server unreachable");

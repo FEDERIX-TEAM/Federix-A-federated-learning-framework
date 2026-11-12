@@ -28,6 +28,8 @@ export interface StackState {
   superAdmin: Account;
   viewer: Account;
   accessTtlSeconds: number;
+  internalToken: string;
+  grafanaUrl: string;
 }
 
 const hex = (n: number) => randomBytes(n).toString("hex");
@@ -62,6 +64,8 @@ export async function startStack(): Promise<StackState> {
   const superAdmin: Account = { email: `owner_${hex(3)}@federix.test`, password: `Pw_${hex(8)}`, name: "Ada Lovelace" };
   const viewer: Account = { email: `viewer_${hex(3)}@federix.test`, password: `Pw_${hex(8)}`, name: "Grace Hopper" };
   const pids: number[] = [];
+  const internalToken = `internal_${hex(12)}`;
+  const grafanaUrl = "http://127.0.0.1:3999";
 
   if (!existsSync(join(DASHBOARD, ".next", "BUILD_ID"))) throw new Error("run `npm run build` before the e2e tests (npm run test:e2e does it)");
 
@@ -77,7 +81,9 @@ export async function startStack(): Promise<StackState> {
       PORT: String(apiPort),
       MONGO_URI: mongoUri,
       REDIS_URL: redisUrl,
-      INTERNAL_SERVICE_TOKEN: `internal_${hex(12)}`,
+      INTERNAL_SERVICE_TOKEN: internalToken,
+      STREAM_AUTH_RECHECK_MS: "1000",
+      EVENT_PING_INTERVAL_MS: "2000",
       PUBLIC_BASE_URL: apiUrl,
       STORAGE_DIR: storageDir,
       LOG_LEVEL: "warn",
@@ -89,7 +95,7 @@ export async function startStack(): Promise<StackState> {
     stdio: ["ignore", "ignore", "inherit"],
   });
   pids.push(backend.pid!);
-  const state: StackState = { apiUrl, dashboardUrl, mongoUri, storageDir, pids, superAdmin, viewer, accessTtlSeconds };
+  const state: StackState = { apiUrl, dashboardUrl, mongoUri, storageDir, pids, superAdmin, viewer, accessTtlSeconds, internalToken, grafanaUrl };
   writeState(state);
 
   await waitFor(`${apiUrl}/federix.v1.SystemService/HealthCheck`, async (r) => r.ok && (await r.json()).db === "connected", backend, "backend");
@@ -103,7 +109,7 @@ export async function startStack(): Promise<StackState> {
 
   const dashboard = spawn(join(DASHBOARD, "node_modules", ".bin", "next"), ["start", "-p", String(dashboardPort), "-H", "127.0.0.1"], {
     cwd: DASHBOARD,
-    env: { ...process.env, FEDERIX_API_URL: apiUrl, FEDERIX_HEALTH_POLL_MS: "1500", NODE_ENV: "production" },
+    env: { ...process.env, FEDERIX_API_URL: apiUrl, FEDERIX_HEALTH_POLL_MS: "1500", FEDERIX_GRAFANA_URL: grafanaUrl, NODE_ENV: "production" },
     stdio: ["ignore", "ignore", "inherit"],
   });
   pids.push(dashboard.pid!);

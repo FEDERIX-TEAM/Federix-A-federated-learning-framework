@@ -10,6 +10,7 @@ import { useTheme } from "@/components/theme";
 import { LogoMark } from "@/components/Logo";
 import { Button, Kbd } from "@/components/ui";
 import { canAccess, GROUPS, itemFor, navFor, ROLE_LABEL } from "@/lib/nav";
+import { LiveEventsProvider } from "@/components/live";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { UserMenu } from "./UserMenu";
@@ -42,7 +43,11 @@ export function AppGate({ children }: { children: ReactNode }) {
   }, [status, endedUnexpectedly, pathname, router]);
 
   if (status !== "signed-in") return <Splash />;
-  return <AppShell>{children}</AppShell>;
+  return (
+    <LiveEventsProvider>
+      <AppShell>{children}</AppShell>
+    </LiveEventsProvider>
+  );
 }
 
 function Forbidden({ label }: { label: string }) {

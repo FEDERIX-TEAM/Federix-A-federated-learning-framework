@@ -44,6 +44,61 @@ export declare type OverviewResponse = Message<"federix.v1.OverviewResponse"> & 
    * @generated from field: string health = 6;
    */
   health: string;
+
+  /**
+   * @generated from field: int32 current_round_number = 7;
+   */
+  currentRoundNumber: number;
+
+  /**
+   * @generated from field: int32 current_round_participants = 8;
+   */
+  currentRoundParticipants: number;
+
+  /**
+   * @generated from field: int32 current_round_max_clients = 9;
+   */
+  currentRoundMaxClients: number;
+
+  /**
+   * @generated from field: int32 current_round_updates = 10;
+   */
+  currentRoundUpdates: number;
+
+  /**
+   * @generated from field: string current_round_started_at = 11;
+   */
+  currentRoundStartedAt: string;
+
+  /**
+   * @generated from field: string current_round_deadline = 12;
+   */
+  currentRoundDeadline: string;
+
+  /**
+   * @generated from field: string current_round_ready_at = 13;
+   */
+  currentRoundReadyAt: string;
+
+  /**
+   * @generated from field: optional double latest_model_accuracy = 14;
+   */
+  latestModelAccuracy?: number | undefined;
+
+  /**
+   * @generated from field: optional double latest_model_loss = 15;
+   */
+  latestModelLoss?: number | undefined;
+
+  /**
+   * @generated from field: int32 completed_rounds = 16;
+   */
+  completedRounds: number;
+
+  /**
+   * @generated from field: int32 banned_clients = 17;
+   */
+  bannedClients: number;
 };
 
 /**
