@@ -9,8 +9,9 @@ import { useAuth } from "@/components/auth";
 import { useTheme } from "@/components/theme";
 import { LogoMark } from "@/components/Logo";
 import { Button, Kbd } from "@/components/ui";
-import { canAccess, GROUPS, itemFor, navFor, ROLE_LABEL } from "@/lib/nav";
+import { canAccess, GROUPS, itemFor, navFor, restrictionFor, ROLE_LABEL } from "@/lib/nav";
 import { LiveEventsProvider } from "@/components/live";
+import { ToastProvider } from "@/components/toast";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { UserMenu } from "./UserMenu";
@@ -45,7 +46,9 @@ export function AppGate({ children }: { children: ReactNode }) {
   if (status !== "signed-in") return <Splash />;
   return (
     <LiveEventsProvider>
-      <AppShell>{children}</AppShell>
+      <ToastProvider>
+        <AppShell>{children}</AppShell>
+      </ToastProvider>
     </LiveEventsProvider>
   );
 }
@@ -195,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main id="main" className={styles.content} tabIndex={-1}>
-          {allowed ? children : <Forbidden label={current?.label ?? "this page"} />}
+          {allowed ? children : <Forbidden label={restrictionFor(pathname)?.label ?? current?.label ?? "this page"} />}
         </main>
       </div>
 

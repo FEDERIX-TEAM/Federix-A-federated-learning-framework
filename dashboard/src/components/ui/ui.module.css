@@ -44,6 +44,16 @@
   background: var(--surface-2);
 }
 
+.danger {
+  background: var(--bad);
+  color: #fff;
+  box-shadow: 0 6px 16px -8px var(--bad);
+}
+
+.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bad) 85%, #000);
+}
+
 .ghost {
   background: transparent;
   color: var(--text-2);

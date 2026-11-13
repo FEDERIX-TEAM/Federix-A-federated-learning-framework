@@ -44,6 +44,13 @@ const pageArgs = (req) => {
 };
 const metricsRounds = (req) => clampN(req.lastNRounds, appConfig.limits.metricsRoundsDefault, appConfig.limits.metricsRoundsMax);
 
+async function clientNames(ids) {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return new Map();
+  const docs = await Client.find({ client_id: { $in: unique } }).select('client_id name').lean();
+  return new Map(docs.map((d) => [d.client_id, d.name]));
+}
+
 export function createAdminService({ redis }) {
   const sessions = createSessionStore(redis);
 
@@ -207,6 +214,11 @@ export function createAdminService({ redis }) {
       }
 
       const rounds = await Round.find(filter).sort({ round_number: -1 }).skip(skip).limit(limit);
+      const counts = await Update.aggregate([
+        { $match: { round_id: { $in: rounds.map((r) => r.round_id) }, status: { $in: ['accepted', 'compressed'] } } },
+        { $group: { _id: '$round_id', n: { $sum: 1 } } },
+      ]);
+      const usable = new Map(counts.map((c) => [c._id, c.n]));
       for (const r of rounds) {
         yield {
           roundId: r.round_id,
@@ -214,8 +226,14 @@ export function createAdminService({ redis }) {
           status: ROUND_STATUS_TO_PROTO[r.status],
           participantCount: joinedCount(r),
           accuracy: num(r.global_accuracy),
+          globalLoss: typeof r.global_loss === 'number' ? r.global_loss : undefined,
           startedAt: dateToIso(r.started_at),
           completedAt: dateToIso(r.completed_at),
+          maxClients: r.max_clients,
+          usableUpdates: usable.get(r.round_id) ?? 0,
+          modelVersionAfter: r.model_version_after ?? 0,
+          endReason: r.failed_reason ?? r.aborted_reason ?? '',
+          notes: r.notes ?? '',
         };
       }
     },
@@ -226,8 +244,12 @@ export function createAdminService({ redis }) {
       if (!round) throw notFound('Round not found');
       const updates = await Update.find({ round_id: round.round_id });
 
+      const names = await clientNames(round.participants.map((p) => p.client_id));
+      const snap = round.config_snapshot ?? {};
+      const snapNum = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
       return {
         roundId: round.round_id,
+        roundNumber: round.round_number,
         updates: updates.map((u) => ({ updateId: u.update_id, clientId: u.client_id, status: UPDATE_STATUS_TO_PROTO[u.status] })),
         utilityScores: updates.map((u) => ({ clientId: u.client_id, score: num(u.utility_score) })),
         globalLoss: num(round.global_loss),
@@ -235,6 +257,33 @@ export function createAdminService({ redis }) {
         startedAt: dateToIso(round.started_at),
         completedAt: dateToIso(round.completed_at),
         status: ROUND_STATUS_TO_PROTO[round.status],
+        maxClients: round.max_clients,
+        minClients: round.min_clients,
+        deadline: dateToIso(round.deadline_at),
+        notes: round.notes ?? '',
+        readyAt: dateToIso(round.ready_at),
+        readyReason: round.ready_reason ?? '',
+        aggregatingStartedAt: dateToIso(round.aggregating_started_at),
+        modelVersionBefore: round.model_version_before ?? 0,
+        modelVersionAfter: round.model_version_after ?? 0,
+        endReason: round.failed_reason ?? round.aborted_reason ?? '',
+        participants: round.participants.map((p) => ({
+          clientId: p.client_id,
+          clientName: names.get(p.client_id) ?? '',
+          status: p.status,
+          joinedAt: dateToIso(p.joined_at),
+          leftAt: dateToIso(p.left_at),
+          leaveReason: p.leave_reason ?? '',
+          localDataSize: p.local_data_size ?? 0,
+        })),
+        config: {
+          mu: snapNum(snap.mu),
+          localEpochs: snapNum(snap.local_epochs),
+          batchSize: snapNum(snap.batch_size),
+          utilityThresholdHigh: snapNum(snap.utility_threshold_high),
+          utilityThresholdLow: snapNum(snap.utility_threshold_low),
+          minClientsPerRound: snapNum(snap.min_clients_per_round),
+        },
       };
     },
 
@@ -244,6 +293,7 @@ export function createAdminService({ redis }) {
       const maxClients = req.maxClients || config.max_clients_per_round;
       const deadlineSeconds = req.deadlineSeconds || config.max_round_duration_seconds;
       if (maxClients < 0 || deadlineSeconds < 0) throw invalidArg('max_clients and deadline_seconds must be positive');
+      if ((req.notes ?? '').length > 500) throw invalidArg('notes must be at most 500 characters');
       if (maxClients < config.min_clients_per_round) {
         throw invalidArg(`max_clients (${maxClients}) is below min_clients_per_round (${config.min_clients_per_round})`);
       }
@@ -292,18 +342,22 @@ export function createAdminService({ redis }) {
       const round = await Round.findOne({ round_id: req.roundId });
       if (!round) throw notFound('Round not found');
       if (!['active', 'aggregating'].includes(round.status)) throw failedPrecondition(`Round is already ${round.status}`);
+      const reason = String(req.reason ?? '').trim().slice(0, 500) || null;
 
-      round.status = 'aborted';
-      round.aborted_reason = req.reason || null;
-      round.completed_at = new Date();
-      await round.save();
+      const stopped = await Round.findOneAndUpdate(
+        { round_id: round.round_id, status: { $in: ['active', 'aggregating'] } },
+        { $set: { status: 'aborted', aborted_reason: reason, completed_at: new Date() }, $unset: { running: 1 } },
+        { returnDocument: 'after' }
+      );
+      if (!stopped) throw failedPrecondition('The round finished while it was being stopped');
+      Object.assign(round, { status: stopped.status });
       await Update.updateMany(
         { round_id: round.round_id, status: { $in: ['pending', 'prepared', 'accepted', 'compressed'] } },
         { status: 'rejected', reason: 'round aborted' }
       );
 
-      publish('round_aborted', { round_id: round.round_id, reason: req.reason }, ADMIN_AND_CLIENTS);
-      await logEvent({ actor: authOf(ctx).sub, eventType: 'round.aborted', details: { round_id: round.round_id, reason: req.reason } });
+      publish('round_aborted', { round_id: round.round_id, reason }, ADMIN_AND_CLIENTS);
+      await logEvent({ actor: authOf(ctx).sub, eventType: 'round.aborted', details: { round_id: round.round_id, reason } });
 
       return { success: true, roundStatus: ROUND_STATUS_TO_PROTO[round.status] };
     },
@@ -311,14 +365,25 @@ export function createAdminService({ redis }) {
     async *listRoundUpdates(req) {
       if (!req.roundId) throw invalidArg('round_id is required');
       const updates = await Update.find({ round_id: req.roundId }).sort({ prepared_at: 1 });
+      const names = await clientNames(updates.map((u) => u.client_id));
       for (const u of updates) {
         yield {
           updateId: u.update_id,
           clientId: u.client_id,
+          clientName: names.get(u.client_id) ?? '',
           utilityScore: num(u.utility_score),
           status: UPDATE_STATUS_TO_PROTO[u.status],
+          stage: u.status === 'prepared' && u.uploaded_at ? 'uploaded' : u.status,
           compressionLevel: COMPRESSION_LEVEL_TO_PROTO[u.compression_level] ?? 0,
+          compressionRatio: num(u.compression_ratio),
           submittedAt: dateToIso(u.submitted_at),
+          preparedAt: dateToIso(u.prepared_at),
+          reason: u.status === 'rejected' ? (u.reason ?? '') : '',
+          bytes: BigInt(u.bytes_uploaded ?? 0),
+          dataSize: u.data_size ?? 0,
+          localLossBefore: num(u.local_loss_before),
+          localLossAfter: num(u.local_loss_after),
+          trainingTimeMs: u.training_time_ms ?? 0,
         };
       }
     },

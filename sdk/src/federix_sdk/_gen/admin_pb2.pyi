@@ -156,7 +156,7 @@ class ListRoundsRequest(_message.Message):
     def __init__(self, page: _Optional[int] = ..., limit: _Optional[int] = ..., status: _Optional[str] = ...) -> None: ...
 
 class RoundListEntry(_message.Message):
-    __slots__ = ("round_id", "round_number", "status", "participant_count", "accuracy", "started_at", "completed_at")
+    __slots__ = ("round_id", "round_number", "status", "participant_count", "accuracy", "started_at", "completed_at", "max_clients", "usable_updates", "model_version_after", "end_reason", "notes", "global_loss")
     ROUND_ID_FIELD_NUMBER: _ClassVar[int]
     ROUND_NUMBER_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
@@ -164,6 +164,12 @@ class RoundListEntry(_message.Message):
     ACCURACY_FIELD_NUMBER: _ClassVar[int]
     STARTED_AT_FIELD_NUMBER: _ClassVar[int]
     COMPLETED_AT_FIELD_NUMBER: _ClassVar[int]
+    MAX_CLIENTS_FIELD_NUMBER: _ClassVar[int]
+    USABLE_UPDATES_FIELD_NUMBER: _ClassVar[int]
+    MODEL_VERSION_AFTER_FIELD_NUMBER: _ClassVar[int]
+    END_REASON_FIELD_NUMBER: _ClassVar[int]
+    NOTES_FIELD_NUMBER: _ClassVar[int]
+    GLOBAL_LOSS_FIELD_NUMBER: _ClassVar[int]
     round_id: str
     round_number: int
     status: _common_pb2.RoundStatus
@@ -171,7 +177,13 @@ class RoundListEntry(_message.Message):
     accuracy: float
     started_at: str
     completed_at: str
-    def __init__(self, round_id: _Optional[str] = ..., round_number: _Optional[int] = ..., status: _Optional[_Union[_common_pb2.RoundStatus, str]] = ..., participant_count: _Optional[int] = ..., accuracy: _Optional[float] = ..., started_at: _Optional[str] = ..., completed_at: _Optional[str] = ...) -> None: ...
+    max_clients: int
+    usable_updates: int
+    model_version_after: int
+    end_reason: str
+    notes: str
+    global_loss: float
+    def __init__(self, round_id: _Optional[str] = ..., round_number: _Optional[int] = ..., status: _Optional[_Union[_common_pb2.RoundStatus, str]] = ..., participant_count: _Optional[int] = ..., accuracy: _Optional[float] = ..., started_at: _Optional[str] = ..., completed_at: _Optional[str] = ..., max_clients: _Optional[int] = ..., usable_updates: _Optional[int] = ..., model_version_after: _Optional[int] = ..., end_reason: _Optional[str] = ..., notes: _Optional[str] = ..., global_loss: _Optional[float] = ...) -> None: ...
 
 class RoundIdRequest(_message.Message):
     __slots__ = ("round_id",)
@@ -198,7 +210,7 @@ class RoundUtilityEntry(_message.Message):
     def __init__(self, client_id: _Optional[str] = ..., score: _Optional[float] = ...) -> None: ...
 
 class RoundDetailResponse(_message.Message):
-    __slots__ = ("round_id", "updates", "utility_scores", "global_loss", "global_accuracy", "started_at", "completed_at", "status")
+    __slots__ = ("round_id", "updates", "utility_scores", "global_loss", "global_accuracy", "started_at", "completed_at", "status", "round_number", "max_clients", "min_clients", "deadline", "notes", "ready_at", "ready_reason", "aggregating_started_at", "model_version_before", "model_version_after", "end_reason", "participants", "config")
     ROUND_ID_FIELD_NUMBER: _ClassVar[int]
     UPDATES_FIELD_NUMBER: _ClassVar[int]
     UTILITY_SCORES_FIELD_NUMBER: _ClassVar[int]
@@ -207,6 +219,19 @@ class RoundDetailResponse(_message.Message):
     STARTED_AT_FIELD_NUMBER: _ClassVar[int]
     COMPLETED_AT_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
+    ROUND_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    MAX_CLIENTS_FIELD_NUMBER: _ClassVar[int]
+    MIN_CLIENTS_FIELD_NUMBER: _ClassVar[int]
+    DEADLINE_FIELD_NUMBER: _ClassVar[int]
+    NOTES_FIELD_NUMBER: _ClassVar[int]
+    READY_AT_FIELD_NUMBER: _ClassVar[int]
+    READY_REASON_FIELD_NUMBER: _ClassVar[int]
+    AGGREGATING_STARTED_AT_FIELD_NUMBER: _ClassVar[int]
+    MODEL_VERSION_BEFORE_FIELD_NUMBER: _ClassVar[int]
+    MODEL_VERSION_AFTER_FIELD_NUMBER: _ClassVar[int]
+    END_REASON_FIELD_NUMBER: _ClassVar[int]
+    PARTICIPANTS_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
     round_id: str
     updates: _containers.RepeatedCompositeFieldContainer[RoundUpdateSummary]
     utility_scores: _containers.RepeatedCompositeFieldContainer[RoundUtilityEntry]
@@ -215,7 +240,54 @@ class RoundDetailResponse(_message.Message):
     started_at: str
     completed_at: str
     status: _common_pb2.RoundStatus
-    def __init__(self, round_id: _Optional[str] = ..., updates: _Optional[_Iterable[_Union[RoundUpdateSummary, _Mapping]]] = ..., utility_scores: _Optional[_Iterable[_Union[RoundUtilityEntry, _Mapping]]] = ..., global_loss: _Optional[float] = ..., global_accuracy: _Optional[float] = ..., started_at: _Optional[str] = ..., completed_at: _Optional[str] = ..., status: _Optional[_Union[_common_pb2.RoundStatus, str]] = ...) -> None: ...
+    round_number: int
+    max_clients: int
+    min_clients: int
+    deadline: str
+    notes: str
+    ready_at: str
+    ready_reason: str
+    aggregating_started_at: str
+    model_version_before: int
+    model_version_after: int
+    end_reason: str
+    participants: _containers.RepeatedCompositeFieldContainer[RoundParticipant]
+    config: RoundConfigSnapshot
+    def __init__(self, round_id: _Optional[str] = ..., updates: _Optional[_Iterable[_Union[RoundUpdateSummary, _Mapping]]] = ..., utility_scores: _Optional[_Iterable[_Union[RoundUtilityEntry, _Mapping]]] = ..., global_loss: _Optional[float] = ..., global_accuracy: _Optional[float] = ..., started_at: _Optional[str] = ..., completed_at: _Optional[str] = ..., status: _Optional[_Union[_common_pb2.RoundStatus, str]] = ..., round_number: _Optional[int] = ..., max_clients: _Optional[int] = ..., min_clients: _Optional[int] = ..., deadline: _Optional[str] = ..., notes: _Optional[str] = ..., ready_at: _Optional[str] = ..., ready_reason: _Optional[str] = ..., aggregating_started_at: _Optional[str] = ..., model_version_before: _Optional[int] = ..., model_version_after: _Optional[int] = ..., end_reason: _Optional[str] = ..., participants: _Optional[_Iterable[_Union[RoundParticipant, _Mapping]]] = ..., config: _Optional[_Union[RoundConfigSnapshot, _Mapping]] = ...) -> None: ...
+
+class RoundParticipant(_message.Message):
+    __slots__ = ("client_id", "client_name", "status", "joined_at", "left_at", "leave_reason", "local_data_size")
+    CLIENT_ID_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_NAME_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    JOINED_AT_FIELD_NUMBER: _ClassVar[int]
+    LEFT_AT_FIELD_NUMBER: _ClassVar[int]
+    LEAVE_REASON_FIELD_NUMBER: _ClassVar[int]
+    LOCAL_DATA_SIZE_FIELD_NUMBER: _ClassVar[int]
+    client_id: str
+    client_name: str
+    status: str
+    joined_at: str
+    left_at: str
+    leave_reason: str
+    local_data_size: int
+    def __init__(self, client_id: _Optional[str] = ..., client_name: _Optional[str] = ..., status: _Optional[str] = ..., joined_at: _Optional[str] = ..., left_at: _Optional[str] = ..., leave_reason: _Optional[str] = ..., local_data_size: _Optional[int] = ...) -> None: ...
+
+class RoundConfigSnapshot(_message.Message):
+    __slots__ = ("mu", "local_epochs", "batch_size", "utility_threshold_high", "utility_threshold_low", "min_clients_per_round")
+    MU_FIELD_NUMBER: _ClassVar[int]
+    LOCAL_EPOCHS_FIELD_NUMBER: _ClassVar[int]
+    BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
+    UTILITY_THRESHOLD_HIGH_FIELD_NUMBER: _ClassVar[int]
+    UTILITY_THRESHOLD_LOW_FIELD_NUMBER: _ClassVar[int]
+    MIN_CLIENTS_PER_ROUND_FIELD_NUMBER: _ClassVar[int]
+    mu: float
+    local_epochs: int
+    batch_size: int
+    utility_threshold_high: float
+    utility_threshold_low: float
+    min_clients_per_round: int
+    def __init__(self, mu: _Optional[float] = ..., local_epochs: _Optional[int] = ..., batch_size: _Optional[int] = ..., utility_threshold_high: _Optional[float] = ..., utility_threshold_low: _Optional[float] = ..., min_clients_per_round: _Optional[int] = ...) -> None: ...
 
 class StartRoundRequest(_message.Message):
     __slots__ = ("max_clients", "deadline_seconds", "notes")
@@ -254,20 +326,40 @@ class StopRoundResponse(_message.Message):
     def __init__(self, success: _Optional[bool] = ..., round_status: _Optional[_Union[_common_pb2.RoundStatus, str]] = ...) -> None: ...
 
 class AdminUpdateEntry(_message.Message):
-    __slots__ = ("update_id", "client_id", "utility_score", "status", "compression_level", "submitted_at")
+    __slots__ = ("update_id", "client_id", "utility_score", "status", "compression_level", "submitted_at", "reason", "bytes", "compression_ratio", "data_size", "local_loss_before", "local_loss_after", "prepared_at", "client_name", "training_time_ms", "stage")
     UPDATE_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ID_FIELD_NUMBER: _ClassVar[int]
     UTILITY_SCORE_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     COMPRESSION_LEVEL_FIELD_NUMBER: _ClassVar[int]
     SUBMITTED_AT_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    BYTES_FIELD_NUMBER: _ClassVar[int]
+    COMPRESSION_RATIO_FIELD_NUMBER: _ClassVar[int]
+    DATA_SIZE_FIELD_NUMBER: _ClassVar[int]
+    LOCAL_LOSS_BEFORE_FIELD_NUMBER: _ClassVar[int]
+    LOCAL_LOSS_AFTER_FIELD_NUMBER: _ClassVar[int]
+    PREPARED_AT_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_NAME_FIELD_NUMBER: _ClassVar[int]
+    TRAINING_TIME_MS_FIELD_NUMBER: _ClassVar[int]
+    STAGE_FIELD_NUMBER: _ClassVar[int]
     update_id: str
     client_id: str
     utility_score: float
     status: _common_pb2.UpdateStatus
     compression_level: _common_pb2.CompressionLevel
     submitted_at: str
-    def __init__(self, update_id: _Optional[str] = ..., client_id: _Optional[str] = ..., utility_score: _Optional[float] = ..., status: _Optional[_Union[_common_pb2.UpdateStatus, str]] = ..., compression_level: _Optional[_Union[_common_pb2.CompressionLevel, str]] = ..., submitted_at: _Optional[str] = ...) -> None: ...
+    reason: str
+    bytes: int
+    compression_ratio: float
+    data_size: int
+    local_loss_before: float
+    local_loss_after: float
+    prepared_at: str
+    client_name: str
+    training_time_ms: int
+    stage: str
+    def __init__(self, update_id: _Optional[str] = ..., client_id: _Optional[str] = ..., utility_score: _Optional[float] = ..., status: _Optional[_Union[_common_pb2.UpdateStatus, str]] = ..., compression_level: _Optional[_Union[_common_pb2.CompressionLevel, str]] = ..., submitted_at: _Optional[str] = ..., reason: _Optional[str] = ..., bytes: _Optional[int] = ..., compression_ratio: _Optional[float] = ..., data_size: _Optional[int] = ..., local_loss_before: _Optional[float] = ..., local_loss_after: _Optional[float] = ..., prepared_at: _Optional[str] = ..., client_name: _Optional[str] = ..., training_time_ms: _Optional[int] = ..., stage: _Optional[str] = ...) -> None: ...
 
 class MetricsRequest(_message.Message):
     __slots__ = ("last_n_rounds",)

@@ -36,7 +36,27 @@ export function itemFor(pathname: string): NavItem | undefined {
   );
 }
 
+export const ACTIONS = {
+  startRound: ["super_admin", "admin", "fl_engineer"],
+  stopRound: ["super_admin", "admin"],
+  roundDetail: ["super_admin", "admin", "fl_engineer"],
+} as const satisfies Record<string, readonly Role[]>;
+
+export type Action = keyof typeof ACTIONS;
+
+export function can(role: Role, action: Action): boolean {
+  return (ACTIONS[action] as readonly Role[]).includes(role);
+}
+
+const SUB_ROUTES: { prefix: string; label: string; action: Action }[] = [{ prefix: "/rounds/", label: "round details", action: "roundDetail" }];
+
+export function restrictionFor(pathname: string): { label: string; action: Action } | undefined {
+  return SUB_ROUTES.find((r) => pathname.startsWith(r.prefix) && pathname.length > r.prefix.length);
+}
+
 export function canAccess(role: Role, pathname: string): boolean {
+  const sub = restrictionFor(pathname);
+  if (sub && !can(role, sub.action)) return false;
   const item = itemFor(pathname);
   return item ? item.roles.includes(role) : true;
 }

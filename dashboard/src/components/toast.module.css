@@ -1,0 +1,71 @@
+.region {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 90;
+  display: grid;
+  gap: 10px;
+  width: min(380px, calc(100vw - 32px));
+}
+
+.toast {
+  --tone: var(--ok);
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 24px;
+  gap: 12px;
+  align-items: start;
+  padding: 13px 12px 13px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--tone);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: rise 0.22s var(--ease);
+}
+
+.toast[data-tone="bad"] {
+  --tone: var(--bad);
+}
+
+.toast > svg {
+  color: var(--tone);
+  margin-top: 1px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.text {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.text strong {
+  font-weight: 620;
+}
+
+.text span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.toast button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.toast button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
