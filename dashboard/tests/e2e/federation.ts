@@ -37,6 +37,11 @@ export class Federation {
     }
   }
 
+  async latestRoundId(): Promise<string> {
+    for await (const r of this.admin.listRounds({ page: 1, limit: 1 }, this.asAdmin)) return r.roundId;
+    throw new Error("there are no rounds yet");
+  }
+
   async latestModelVersion(): Promise<number> {
     let latest = 0;
     for await (const m of this.admin.listModels({}, this.asAdmin)) latest = Math.max(latest, m.modelVersion);
@@ -84,11 +89,24 @@ export class Federation {
     return prepared.updateId;
   }
 
-  async complete(roundId: string, accuracy: number, loss: number) {
+  async complete(roundId: string, accuracy: number, loss: number, rejectionReasons: Record<string, string> = {}) {
     await this.fl.triggerRound({ roundId }, this.internal);
+    const usable: string[] = [];
+    for await (const u of this.fl.getRoundUpdates({ roundId }, this.internal)) usable.push(u.updateId);
     const version = (await this.latestModelVersion()) + 1;
     const path = await this.uploadModel(version);
-    await this.fl.completeRound({ roundId, newModelVersion: version, modelUrl: path, globalAccuracy: accuracy, globalLoss: loss }, this.internal);
+    await this.fl.completeRound(
+      {
+        roundId,
+        newModelVersion: version,
+        modelUrl: path,
+        globalAccuracy: accuracy,
+        globalLoss: loss,
+        usedUpdateIds: usable.filter((id) => !(id in rejectionReasons)),
+        rejectionReasons,
+      },
+      this.internal,
+    );
     return version;
   }
 

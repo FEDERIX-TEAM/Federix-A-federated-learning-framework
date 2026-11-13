@@ -433,6 +433,36 @@ export declare type RoundListEntry = Message<"federix.v1.RoundListEntry"> & {
    * @generated from field: string completed_at = 7;
    */
   completedAt: string;
+
+  /**
+   * @generated from field: int32 max_clients = 8;
+   */
+  maxClients: number;
+
+  /**
+   * @generated from field: int32 usable_updates = 9;
+   */
+  usableUpdates: number;
+
+  /**
+   * @generated from field: int32 model_version_after = 10;
+   */
+  modelVersionAfter: number;
+
+  /**
+   * @generated from field: string end_reason = 11;
+   */
+  endReason: string;
+
+  /**
+   * @generated from field: string notes = 12;
+   */
+  notes: string;
+
+  /**
+   * @generated from field: optional double global_loss = 13;
+   */
+  globalLoss?: number | undefined;
 };
 
 /**
@@ -547,6 +577,71 @@ export declare type RoundDetailResponse = Message<"federix.v1.RoundDetailRespons
    * @generated from field: federix.v1.RoundStatus status = 8;
    */
   status: RoundStatus;
+
+  /**
+   * @generated from field: int32 round_number = 9;
+   */
+  roundNumber: number;
+
+  /**
+   * @generated from field: int32 max_clients = 10;
+   */
+  maxClients: number;
+
+  /**
+   * @generated from field: int32 min_clients = 11;
+   */
+  minClients: number;
+
+  /**
+   * @generated from field: string deadline = 12;
+   */
+  deadline: string;
+
+  /**
+   * @generated from field: string notes = 13;
+   */
+  notes: string;
+
+  /**
+   * @generated from field: string ready_at = 14;
+   */
+  readyAt: string;
+
+  /**
+   * @generated from field: string ready_reason = 15;
+   */
+  readyReason: string;
+
+  /**
+   * @generated from field: string aggregating_started_at = 16;
+   */
+  aggregatingStartedAt: string;
+
+  /**
+   * @generated from field: int32 model_version_before = 17;
+   */
+  modelVersionBefore: number;
+
+  /**
+   * @generated from field: int32 model_version_after = 18;
+   */
+  modelVersionAfter: number;
+
+  /**
+   * @generated from field: string end_reason = 19;
+   */
+  endReason: string;
+
+  /**
+   * @generated from field: repeated federix.v1.RoundParticipant participants = 20;
+   */
+  participants: RoundParticipant[];
+
+  /**
+   * @generated from field: federix.v1.RoundConfigSnapshot config = 21;
+   */
+  config?: RoundConfigSnapshot | undefined;
 };
 
 /**
@@ -554,6 +649,93 @@ export declare type RoundDetailResponse = Message<"federix.v1.RoundDetailRespons
  * Use `create(RoundDetailResponseSchema)` to create a new message.
  */
 export declare const RoundDetailResponseSchema: GenMessage<RoundDetailResponse>;
+
+/**
+ * @generated from message federix.v1.RoundParticipant
+ */
+export declare type RoundParticipant = Message<"federix.v1.RoundParticipant"> & {
+  /**
+   * @generated from field: string client_id = 1;
+   */
+  clientId: string;
+
+  /**
+   * @generated from field: string client_name = 2;
+   */
+  clientName: string;
+
+  /**
+   * @generated from field: string status = 3;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string joined_at = 4;
+   */
+  joinedAt: string;
+
+  /**
+   * @generated from field: string left_at = 5;
+   */
+  leftAt: string;
+
+  /**
+   * @generated from field: string leave_reason = 6;
+   */
+  leaveReason: string;
+
+  /**
+   * @generated from field: int32 local_data_size = 7;
+   */
+  localDataSize: number;
+};
+
+/**
+ * Describes the message federix.v1.RoundParticipant.
+ * Use `create(RoundParticipantSchema)` to create a new message.
+ */
+export declare const RoundParticipantSchema: GenMessage<RoundParticipant>;
+
+/**
+ * @generated from message federix.v1.RoundConfigSnapshot
+ */
+export declare type RoundConfigSnapshot = Message<"federix.v1.RoundConfigSnapshot"> & {
+  /**
+   * @generated from field: double mu = 1;
+   */
+  mu: number;
+
+  /**
+   * @generated from field: int32 local_epochs = 2;
+   */
+  localEpochs: number;
+
+  /**
+   * @generated from field: int32 batch_size = 3;
+   */
+  batchSize: number;
+
+  /**
+   * @generated from field: double utility_threshold_high = 4;
+   */
+  utilityThresholdHigh: number;
+
+  /**
+   * @generated from field: double utility_threshold_low = 5;
+   */
+  utilityThresholdLow: number;
+
+  /**
+   * @generated from field: int32 min_clients_per_round = 6;
+   */
+  minClientsPerRound: number;
+};
+
+/**
+ * Describes the message federix.v1.RoundConfigSnapshot.
+ * Use `create(RoundConfigSnapshotSchema)` to create a new message.
+ */
+export declare const RoundConfigSnapshotSchema: GenMessage<RoundConfigSnapshot>;
 
 /**
  * @generated from message federix.v1.StartRoundRequest
@@ -682,6 +864,56 @@ export declare type AdminUpdateEntry = Message<"federix.v1.AdminUpdateEntry"> & 
    * @generated from field: string submitted_at = 6;
    */
   submittedAt: string;
+
+  /**
+   * @generated from field: string reason = 7;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: int64 bytes = 8;
+   */
+  bytes: bigint;
+
+  /**
+   * @generated from field: double compression_ratio = 9;
+   */
+  compressionRatio: number;
+
+  /**
+   * @generated from field: int32 data_size = 10;
+   */
+  dataSize: number;
+
+  /**
+   * @generated from field: double local_loss_before = 11;
+   */
+  localLossBefore: number;
+
+  /**
+   * @generated from field: double local_loss_after = 12;
+   */
+  localLossAfter: number;
+
+  /**
+   * @generated from field: string prepared_at = 13;
+   */
+  preparedAt: string;
+
+  /**
+   * @generated from field: string client_name = 14;
+   */
+  clientName: string;
+
+  /**
+   * @generated from field: int32 training_time_ms = 15;
+   */
+  trainingTimeMs: number;
+
+  /**
+   * @generated from field: string stage = 16;
+   */
+  stage: string;
 };
 
 /**

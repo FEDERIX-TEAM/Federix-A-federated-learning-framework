@@ -145,6 +145,12 @@ message RoundListEntry {
   double accuracy = 5;
   string started_at = 6;
   string completed_at = 7;
+  int32 max_clients = 8;
+  int32 usable_updates = 9;
+  int32 model_version_after = 10;
+  string end_reason = 11;
+  string notes = 12;
+  optional double global_loss = 13;
 }
 
 message RoundIdRequest {
@@ -171,6 +177,38 @@ message RoundDetailResponse {
   string started_at = 6;
   string completed_at = 7;
   RoundStatus status = 8;
+  int32 round_number = 9;
+  int32 max_clients = 10;
+  int32 min_clients = 11;
+  string deadline = 12;
+  string notes = 13;
+  string ready_at = 14;
+  string ready_reason = 15;
+  string aggregating_started_at = 16;
+  int32 model_version_before = 17;
+  int32 model_version_after = 18;
+  string end_reason = 19;
+  repeated RoundParticipant participants = 20;
+  RoundConfigSnapshot config = 21;
+}
+
+message RoundParticipant {
+  string client_id = 1;
+  string client_name = 2;
+  string status = 3;
+  string joined_at = 4;
+  string left_at = 5;
+  string leave_reason = 6;
+  int32 local_data_size = 7;
+}
+
+message RoundConfigSnapshot {
+  double mu = 1;
+  int32 local_epochs = 2;
+  int32 batch_size = 3;
+  double utility_threshold_high = 4;
+  double utility_threshold_low = 5;
+  int32 min_clients_per_round = 6;
 }
 
 message StartRoundRequest {
@@ -202,6 +240,16 @@ message AdminUpdateEntry {
   UpdateStatus status = 4;
   CompressionLevel compression_level = 5;
   string submitted_at = 6;
+  string reason = 7;
+  int64 bytes = 8;
+  double compression_ratio = 9;
+  int32 data_size = 10;
+  double local_loss_before = 11;
+  double local_loss_after = 12;
+  string prepared_at = 13;
+  string client_name = 14;
+  int32 training_time_ms = 15;
+  string stage = 16;
 }
 
 // ---- Metrics ----

@@ -1,0 +1,251 @@
+.page {
+  display: grid;
+  gap: 16px;
+  max-width: 1440px;
+}
+
+.running {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px 14px 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--accent-soft), transparent 70%), var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.runningPulse {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent-ring);
+  animation: ping 1.8s var(--ease) infinite;
+}
+
+@keyframes ping {
+  70% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.runningText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.runningText strong {
+  font-weight: 620;
+}
+
+.runningText > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.runningActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.runningLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-weight: 580;
+  color: var(--accent);
+}
+
+.runningLink:hover {
+  background: var(--accent-soft);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr[data-clickable] {
+  cursor: pointer;
+}
+
+.table tbody tr:hover td {
+  background: var(--hover);
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.of {
+  color: var(--faint);
+}
+
+.roundCell,
+.statusCell {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+}
+
+.roundLink {
+  font-weight: 620;
+}
+
+a.roundLink:hover {
+  color: var(--accent);
+}
+
+.notes,
+.reason {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reason {
+  color: var(--bad);
+}
+
+.model {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--raised);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.chevron {
+  width: 32px;
+  color: var(--faint);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.loading {
+  display: grid;
+  gap: 1px;
+}
+
+.skeletonRow {
+  height: 48px;
+  background: linear-gradient(90deg, var(--surface), var(--surface-2), var(--surface));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-bottom: 1px solid var(--border);
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 56px 16px;
+  text-align: center;
+}
+
+.empty strong {
+  font-weight: 620;
+}
+
+.empty p {
+  max-width: 40ch;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: var(--raised);
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .running {
+    flex-wrap: wrap;
+  }
+  .runningActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
